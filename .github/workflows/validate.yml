@@ -1,0 +1,26 @@
+name: Validate OpenAPI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - name: Lint JSON and YAML specifications
+        run: npx --yes @redocly/cli@2.46.1 lint latest/openapi.spec3.json latest/openapi.spec3.yaml
+      - name: Normalize YAML specification
+        run: npx --yes @redocly/cli@2.46.1 bundle latest/openapi.spec3.yaml --output "$RUNNER_TEMP/openapi-from-yaml.json" --ext json
+      - name: Validate public artifacts
+        run: node scripts/validate-artifacts.mjs latest/openapi.spec3.json "$RUNNER_TEMP/openapi-from-yaml.json"

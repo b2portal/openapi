@@ -1,0 +1,6638 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "B2 Portal Developer API",
+    "version": "0.1.0",
+    "license": {
+      "name": "Proprietary",
+      "url": "https://b2portal.com/terms"
+    },
+    "description": "Tenant- and location-scoped RFQ intake, catalog, and draft-triage API. V1 never pushes an RFQ to CoreBridge; the response returns operator review context instead."
+  },
+  "servers": [
+    {
+      "url": "https://api.b2portal.com/api/v1",
+      "description": "Production"
+    }
+  ],
+  "paths": {
+    "/locations": {
+      "get": {
+        "tags": [
+          "Developer API V1"
+        ],
+        "summary": "List authorized locations",
+        "description": "Returns the currently routable intersection of the key's location grants and live CoreBridge V2 locations.",
+        "operationId": "listLocations",
+        "security": [
+          {
+            "developerApiKey": []
+          }
+        ],
+        "x-required-scope": "locations:read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationList"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/accounts": {
+      "get": {
+        "tags": [
+          "Developer API V1"
+        ],
+        "summary": "Search customer accounts",
+        "description": "Searches accounts in one granted CoreBridge location. Results are live, bounded, and cursor-paginated; V1 does not provide an unbounded account export.",
+        "operationId": "searchAccounts",
+        "security": [
+          {
+            "developerApiKey": []
+          }
+        ],
+        "x-required-scope": "directory:read",
+        "parameters": [
+          {
+            "name": "locationId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "B2 Portal CoreBridge location ID granted to the API key."
+          },
+          {
+            "name": "query",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 200
+            }
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 50
+            }
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/accounts/{accountId}": {
+      "get": {
+        "tags": [
+          "Developer API V1"
+        ],
+        "summary": "Get a customer account",
+        "description": "Re-reads one exact account through the granted location's live CoreBridge connection.",
+        "operationId": "getAccount",
+        "security": [
+          {
+            "developerApiKey": []
+          }
+        ],
+        "x-required-scope": "directory:read",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "path",
+            "required": true,
+            "description": "Opaque account ID returned by the directory.",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          },
+          {
+            "name": "locationId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "B2 Portal CoreBridge location ID granted to the API key."
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectoryAccount"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/contacts": {
+      "get": {
+        "tags": [
+          "Developer API V1"
+        ],
+        "summary": "List account contacts",
+        "description": "Lists or searches contacts beneath one exact account. Contact reads are never tenant-global.",
+        "operationId": "searchContacts",
+        "security": [
+          {
+            "developerApiKey": []
+          }
+        ],
+        "x-required-scope": "directory:read",
+        "parameters": [
+          {
+            "name": "locationId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "B2 Portal CoreBridge location ID granted to the API key."
+          },
+          {
+            "name": "accountId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          },
+          {
+            "name": "query",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 50
+            }
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/contacts/{contactId}": {
+      "get": {
+        "tags": [
+          "Developer API V1"
+        ],
+        "summary": "Get an account contact",
+        "description": "Returns one contact only after revalidating that it still belongs to the supplied account.",
+        "operationId": "getContact",
+        "security": [
+          {
+            "developerApiKey": []
+          }
+        ],
+        "x-required-scope": "directory:read",
+        "parameters": [
+          {
+            "name": "contactId",
+            "in": "path",
+            "required": true,
+            "description": "Opaque contact ID returned by the directory.",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          },
+          {
+            "name": "locationId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "B2 Portal CoreBridge location ID granted to the API key."
+          },
+          {
+            "name": "accountId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectoryContact"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/uploads": {
+      "post": {
+        "tags": [
+          "Developer API V1"
+        ],
+        "summary": "Prepare an attachment upload",
+        "description": "Creates a constrained, tenant-owned direct-upload capability. Upload bytes directly to the returned storage destination, then confirm the upload.",
+        "operationId": "prepareUpload",
+        "security": [
+          {
+            "developerApiKey": []
+          }
+        ],
+        "x-required-scope": "intakes:write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrepareUploadRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Upload capability created.",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreparedUpload"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/uploads/{uploadId}/confirm": {
+      "post": {
+        "tags": [
+          "Developer API V1"
+        ],
+        "summary": "Confirm an attachment upload",
+        "description": "Verifies the uploaded object's size, MIME type, ownership, and expiration before it can be attached to an intake.",
+        "operationId": "confirmUpload",
+        "security": [
+          {
+            "developerApiKey": []
+          }
+        ],
+        "x-required-scope": "intakes:write",
+        "parameters": [
+          {
+            "name": "uploadId",
+            "in": "path",
+            "required": true,
+            "description": "Prepared upload ID.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfirmedUpload"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/intakes": {
+      "post": {
+        "tags": [
+          "Developer API V1"
+        ],
+        "summary": "Create an RFQ intake",
+        "description": "Accepts notes and confirmed upload IDs, persists the intake atomically, and returns before asynchronous RFQ extraction completes.",
+        "operationId": "createIntake",
+        "security": [
+          {
+            "developerApiKey": []
+          }
+        ],
+        "x-required-scope": "intakes:write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateIntakeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Intake accepted for processing.",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptedIntake"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/intakes/{intakeId}": {
+      "get": {
+        "tags": [
+          "Developer API V1"
+        ],
+        "summary": "Get intake status",
+        "description": "Returns sanitized processing state for an intake owned by the key's organization and an allowed location. Replacement keys can continue in-flight work when they retain the required scope and location grant.",
+        "operationId": "getIntake",
+        "security": [
+          {
+            "developerApiKey": []
+          }
+        ],
+        "x-required-scope": "intakes:read",
+        "parameters": [
+          {
+            "name": "intakeId",
+            "in": "path",
+            "required": true,
+            "description": "Client-supplied intake ID.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Intake"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/intakes/{intakeId}/review-context": {
+      "get": {
+        "tags": [
+          "Developer API V1"
+        ],
+        "summary": "Get intake review context",
+        "description": "Returns the current pre-order review and versioned customer-resolution target before an RFQ exists.",
+        "operationId": "getIntakeReviewContext",
+        "security": [
+          {
+            "developerApiKey": []
+          }
+        ],
+        "x-required-scope": "rfqs:read",
+        "parameters": [
+          {
+            "name": "intakeId",
+            "in": "path",
+            "required": true,
+            "description": "Client-supplied intake ID.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "locationId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "B2 Portal CoreBridge location ID granted to the API key."
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntakeReviewContext"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/intakes/{intakeId}/draft-actions": {
+      "post": {
+        "tags": [
+          "Developer API V1"
+        ],
+        "summary": "Apply an intake draft action",
+        "description": "Applies one versioned pre-order review action, then resumes asynchronous intake processing. It cannot push to CoreBridge.",
+        "operationId": "applyIntakeDraftAction",
+        "security": [
+          {
+            "developerApiKey": []
+          }
+        ],
+        "x-required-scope": "rfqs:write",
+        "parameters": [
+          {
+            "name": "intakeId",
+            "in": "path",
+            "required": true,
+            "description": "Client-supplied intake ID.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerReviewDraftActionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntakeDraftActionResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/rfqs/{rfqId}": {
+      "get": {
+        "tags": [
+          "Developer API V1"
+        ],
+        "summary": "Get an RFQ",
+        "description": "Returns the current RFQ summary and optimistic draft revision for an authorized location.",
+        "operationId": "getRfq",
+        "security": [
+          {
+            "developerApiKey": []
+          }
+        ],
+        "x-required-scope": "rfqs:read",
+        "parameters": [
+          {
+            "name": "rfqId",
+            "in": "path",
+            "required": true,
+            "description": "B2 Portal RFQ ID.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "locationId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "B2 Portal CoreBridge location ID granted to the API key."
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rfq"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/rfqs/{rfqId}/review-context": {
+      "get": {
+        "tags": [
+          "Developer API V1"
+        ],
+        "summary": "Get RFQ review context",
+        "description": "Returns customer resolution, line-item state, ranked QuickProduct candidates, review targets, allowed actions, and the operator review path.",
+        "operationId": "getRfqReviewContext",
+        "security": [
+          {
+            "developerApiKey": []
+          }
+        ],
+        "x-required-scope": "rfqs:read",
+        "parameters": [
+          {
+            "name": "rfqId",
+            "in": "path",
+            "required": true,
+            "description": "B2 Portal RFQ ID.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "locationId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "B2 Portal CoreBridge location ID granted to the API key."
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewContext"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/catalog/quick-products": {
+      "get": {
+        "tags": [
+          "Developer API V1"
+        ],
+        "summary": "List QuickProducts",
+        "description": "Reads active QuickProducts from B2 Portal's synchronized local CoreBridge V2 catalog. This endpoint never calls CoreBridge live.",
+        "operationId": "listQuickProducts",
+        "security": [
+          {
+            "developerApiKey": []
+          }
+        ],
+        "x-required-scope": "catalog:read",
+        "parameters": [
+          {
+            "name": "locationId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "B2 Portal CoreBridge location ID granted to the API key."
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 50
+            }
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuickProductPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/catalog/quick-products/{quickProductId}": {
+      "get": {
+        "tags": [
+          "Developer API V1"
+        ],
+        "summary": "Get a QuickProduct",
+        "description": "Returns synchronized QuickProduct details and a bounded page of constituent parts.",
+        "operationId": "getQuickProduct",
+        "security": [
+          {
+            "developerApiKey": []
+          }
+        ],
+        "x-required-scope": "catalog:read",
+        "parameters": [
+          {
+            "name": "quickProductId",
+            "in": "path",
+            "required": true,
+            "description": "B2 Portal QuickProduct ID.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "locationId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "B2 Portal CoreBridge location ID granted to the API key."
+          },
+          {
+            "name": "partCursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 2000
+            }
+          },
+          {
+            "name": "partLimit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 100
+            }
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuickProductDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/catalog/search": {
+      "get": {
+        "tags": [
+          "Developer API V1"
+        ],
+        "summary": "Search the catalog",
+        "description": "Searches synchronized QuickProducts and returns ranked local candidates for operator or agent triage.",
+        "operationId": "searchCatalog",
+        "security": [
+          {
+            "developerApiKey": []
+          }
+        ],
+        "x-required-scope": "catalog:read",
+        "parameters": [
+          {
+            "name": "locationId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "B2 Portal CoreBridge location ID granted to the API key."
+          },
+          {
+            "name": "query",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20,
+              "default": 20
+            }
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogSearchResults"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/rfqs/{rfqId}/draft-actions": {
+      "post": {
+        "tags": [
+          "Developer API V1"
+        ],
+        "summary": "Apply an RFQ draft action",
+        "description": "Applies one optimistic, idempotent draft mutation such as customer resolution, QuickProduct selection, custom line creation, field edits, or review resolution. It cannot push to CoreBridge.",
+        "operationId": "applyRfqDraftAction",
+        "security": [
+          {
+            "developerApiKey": []
+          }
+        ],
+        "x-required-scope": "rfqs:write",
+        "parameters": [
+          {
+            "name": "rfqId",
+            "in": "path",
+            "required": true,
+            "description": "B2 Portal RFQ ID.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DraftActionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftActionResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "developerApiKey": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Developer API key created in Settings → Developers. MCP access tokens are not accepted."
+      }
+    },
+    "parameters": {
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 200
+        },
+        "description": "Unique mutation key retained for 24 hours. Reusing it with different input returns 409."
+      },
+      "CorrelationId": {
+        "name": "X-Correlation-ID",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "description": "Caller trace ID. B2 Portal generates and returns one when omitted."
+      },
+      "Cursor": {
+        "name": "cursor",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "description": "Opaque cursor returned by the previous page."
+      }
+    },
+    "headers": {
+      "CorrelationId": {
+        "description": "Request correlation ID.",
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "RateLimitLimit": {
+        "description": "Per-key request limit for the current operation class.",
+        "schema": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "RateLimitRemaining": {
+        "description": "Requests remaining in the current fixed window.",
+        "schema": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "RateLimitReset": {
+        "description": "Seconds until the current fixed window resets.",
+        "schema": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "RetryAfter": {
+        "description": "Seconds to wait before retrying a limited request.",
+        "schema": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "HTTP 400 Developer API error.",
+        "headers": {
+          "X-Correlation-ID": {
+            "$ref": "#/components/headers/CorrelationId"
+          },
+          "RateLimit-Limit": {
+            "$ref": "#/components/headers/RateLimitLimit"
+          },
+          "RateLimit-Remaining": {
+            "$ref": "#/components/headers/RateLimitRemaining"
+          },
+          "RateLimit-Reset": {
+            "$ref": "#/components/headers/RateLimitReset"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "HTTP 401 Developer API error.",
+        "headers": {
+          "X-Correlation-ID": {
+            "$ref": "#/components/headers/CorrelationId"
+          },
+          "RateLimit-Limit": {
+            "$ref": "#/components/headers/RateLimitLimit"
+          },
+          "RateLimit-Remaining": {
+            "$ref": "#/components/headers/RateLimitRemaining"
+          },
+          "RateLimit-Reset": {
+            "$ref": "#/components/headers/RateLimitReset"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "HTTP 403 Developer API error.",
+        "headers": {
+          "X-Correlation-ID": {
+            "$ref": "#/components/headers/CorrelationId"
+          },
+          "RateLimit-Limit": {
+            "$ref": "#/components/headers/RateLimitLimit"
+          },
+          "RateLimit-Remaining": {
+            "$ref": "#/components/headers/RateLimitRemaining"
+          },
+          "RateLimit-Reset": {
+            "$ref": "#/components/headers/RateLimitReset"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "HTTP 404 Developer API error.",
+        "headers": {
+          "X-Correlation-ID": {
+            "$ref": "#/components/headers/CorrelationId"
+          },
+          "RateLimit-Limit": {
+            "$ref": "#/components/headers/RateLimitLimit"
+          },
+          "RateLimit-Remaining": {
+            "$ref": "#/components/headers/RateLimitRemaining"
+          },
+          "RateLimit-Reset": {
+            "$ref": "#/components/headers/RateLimitReset"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "HTTP 409 Developer API error.",
+        "headers": {
+          "X-Correlation-ID": {
+            "$ref": "#/components/headers/CorrelationId"
+          },
+          "RateLimit-Limit": {
+            "$ref": "#/components/headers/RateLimitLimit"
+          },
+          "RateLimit-Remaining": {
+            "$ref": "#/components/headers/RateLimitRemaining"
+          },
+          "RateLimit-Reset": {
+            "$ref": "#/components/headers/RateLimitReset"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "PayloadTooLarge": {
+        "description": "HTTP 413 Developer API error.",
+        "headers": {
+          "X-Correlation-ID": {
+            "$ref": "#/components/headers/CorrelationId"
+          },
+          "RateLimit-Limit": {
+            "$ref": "#/components/headers/RateLimitLimit"
+          },
+          "RateLimit-Remaining": {
+            "$ref": "#/components/headers/RateLimitRemaining"
+          },
+          "RateLimit-Reset": {
+            "$ref": "#/components/headers/RateLimitReset"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "RateLimited": {
+        "description": "HTTP 429 Developer API error.",
+        "headers": {
+          "X-Correlation-ID": {
+            "$ref": "#/components/headers/CorrelationId"
+          },
+          "RateLimit-Limit": {
+            "$ref": "#/components/headers/RateLimitLimit"
+          },
+          "RateLimit-Remaining": {
+            "$ref": "#/components/headers/RateLimitRemaining"
+          },
+          "RateLimit-Reset": {
+            "$ref": "#/components/headers/RateLimitReset"
+          },
+          "Retry-After": {
+            "$ref": "#/components/headers/RetryAfter"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "InternalServerError": {
+        "description": "HTTP 500 Developer API error.",
+        "headers": {
+          "X-Correlation-ID": {
+            "$ref": "#/components/headers/CorrelationId"
+          },
+          "RateLimit-Limit": {
+            "$ref": "#/components/headers/RateLimitLimit"
+          },
+          "RateLimit-Remaining": {
+            "$ref": "#/components/headers/RateLimitRemaining"
+          },
+          "RateLimit-Reset": {
+            "$ref": "#/components/headers/RateLimitReset"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "Unavailable": {
+        "description": "HTTP 503 Developer API error.",
+        "headers": {
+          "X-Correlation-ID": {
+            "$ref": "#/components/headers/CorrelationId"
+          },
+          "RateLimit-Limit": {
+            "$ref": "#/components/headers/RateLimitLimit"
+          },
+          "RateLimit-Remaining": {
+            "$ref": "#/components/headers/RateLimitRemaining"
+          },
+          "RateLimit-Reset": {
+            "$ref": "#/components/headers/RateLimitReset"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "ErrorEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "code",
+              "message",
+              "correlationId"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "DEVELOPER_API_INVALID_CREDENTIAL",
+                  "DEVELOPER_API_INSUFFICIENT_SCOPE",
+                  "DEVELOPER_API_TENANT_FORBIDDEN",
+                  "DEVELOPER_API_LOCATION_FORBIDDEN",
+                  "DEVELOPER_API_INVALID_INPUT",
+                  "DEVELOPER_API_NOT_FOUND",
+                  "DEVELOPER_API_CONFLICT",
+                  "DEVELOPER_API_RATE_LIMITED",
+                  "DEVELOPER_API_UNAVAILABLE"
+                ]
+              },
+              "message": {
+                "type": "string"
+              },
+              "correlationId": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid"
+              }
+            }
+          }
+        }
+      },
+      "Location": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "coreBridgeLocationId"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "coreBridgeLocationId": {
+            "type": "integer"
+          }
+        }
+      },
+      "LocationList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "locations"
+        ],
+        "properties": {
+          "locations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Location"
+            }
+          }
+        }
+      },
+      "DirectorySource": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "system",
+          "version"
+        ],
+        "properties": {
+          "system": {
+            "type": "string",
+            "const": "corebridge"
+          },
+          "version": {
+            "type": "string",
+            "const": "v2"
+          }
+        }
+      },
+      "DirectoryAccount": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "email",
+          "phone",
+          "source"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "email"
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source": {
+            "$ref": "#/components/schemas/DirectorySource"
+          }
+        }
+      },
+      "DirectoryContact": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "accountId",
+          "name",
+          "email",
+          "phone",
+          "source"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "accountId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "email"
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source": {
+            "$ref": "#/components/schemas/DirectorySource"
+          }
+        }
+      },
+      "AccountPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "accounts",
+          "nextCursor"
+        ],
+        "properties": {
+          "accounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DirectoryAccount"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ContactPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "contacts",
+          "nextCursor"
+        ],
+        "properties": {
+          "contacts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DirectoryContact"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "CustomerSelection": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "accountId"
+        ],
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "contactId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          }
+        }
+      },
+      "AcceptedCustomerSelection": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "accountId",
+          "contactId",
+          "state"
+        ],
+        "properties": {
+          "accountId": {
+            "type": "string"
+          },
+          "contactId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state": {
+            "type": "string",
+            "const": "VALIDATED"
+          }
+        }
+      },
+      "PrepareUploadRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "intakeId",
+          "locationId",
+          "fileName",
+          "mimeType",
+          "fileSize"
+        ],
+        "properties": {
+          "intakeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "locationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fileName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "mimeType": {
+            "type": "string",
+            "enum": [
+              "application/pdf",
+              "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+              "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+              "image/avif",
+              "image/bmp",
+              "image/gif",
+              "image/jpeg",
+              "image/png",
+              "image/webp"
+            ]
+          },
+          "fileSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10485760
+          }
+        }
+      },
+      "PreparedUpload": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "uploadId",
+          "intakeId",
+          "locationId",
+          "fileName",
+          "mimeType",
+          "fileSize",
+          "expiresAt",
+          "upload"
+        ],
+        "properties": {
+          "uploadId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "intakeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "locationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string",
+            "enum": [
+              "application/pdf",
+              "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+              "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+              "image/avif",
+              "image/bmp",
+              "image/gif",
+              "image/jpeg",
+              "image/png",
+              "image/webp"
+            ]
+          },
+          "fileSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10485760
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "upload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "url",
+              "fields",
+              "fileField"
+            ],
+            "properties": {
+              "url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "fields": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "fileField": {
+                "type": "string",
+                "const": "file"
+              }
+            }
+          }
+        }
+      },
+      "ConfirmedUpload": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "uploadId",
+          "confirmed",
+          "intakeId"
+        ],
+        "properties": {
+          "uploadId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "confirmed": {
+            "type": "boolean",
+            "const": true
+          },
+          "intakeId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "CreateIntakeRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "intakeId",
+          "locationId",
+          "notes",
+          "uploadIds"
+        ],
+        "anyOf": [
+          {
+            "properties": {
+              "notes": {
+                "type": "string",
+                "pattern": "\\S"
+              }
+            }
+          },
+          {
+            "properties": {
+              "uploadIds": {
+                "type": "array",
+                "minItems": 1
+              }
+            }
+          }
+        ],
+        "properties": {
+          "intakeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "locationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 100000
+          },
+          "uploadIds": {
+            "type": "array",
+            "maxItems": 5,
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "customerSelection": {
+            "$ref": "#/components/schemas/CustomerSelection"
+          }
+        }
+      },
+      "AcceptedIntake": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "intakeId",
+          "state",
+          "handoffState",
+          "locationId",
+          "attachmentCount",
+          "rfqId",
+          "reviewId",
+          "reviewPath",
+          "reviewUrl",
+          "coreBridgePushAllowed",
+          "customerSelection"
+        ],
+        "properties": {
+          "intakeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string",
+            "const": "QUEUED"
+          },
+          "handoffState": {
+            "type": "string",
+            "const": "PENDING"
+          },
+          "locationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "attachmentCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5
+          },
+          "rfqId": {
+            "type": "null"
+          },
+          "reviewId": {
+            "type": "null"
+          },
+          "reviewPath": {
+            "type": "null"
+          },
+          "reviewUrl": {
+            "type": "null"
+          },
+          "coreBridgePushAllowed": {
+            "type": "boolean",
+            "const": false
+          },
+          "customerSelection": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AcceptedCustomerSelection"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "Intake": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "intakeId",
+          "createdAt",
+          "locationId",
+          "correlationId",
+          "notesLength",
+          "attachmentCount",
+          "state",
+          "draftRevision",
+          "handoffState",
+          "rfqId",
+          "reviewId",
+          "reviewPath",
+          "reviewUrl",
+          "coreBridgePushAllowed",
+          "customerSelection"
+        ],
+        "properties": {
+          "intakeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "locationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "correlationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "notesLength": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100000
+          },
+          "attachmentCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "SAVED",
+              "PROCESSING",
+              "NEEDS_REVIEW",
+              "COMPLETED",
+              "FAILED",
+              "EXPIRED"
+            ]
+          },
+          "draftRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "handoffState": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rfqId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "reviewId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "reviewPath": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reviewUrl": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri"
+          },
+          "coreBridgePushAllowed": {
+            "type": "boolean",
+            "const": false
+          },
+          "customerSelection": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "accountId",
+                  "contactId",
+                  "state",
+                  "reasonCode"
+                ],
+                "properties": {
+                  "accountId": {
+                    "type": "string"
+                  },
+                  "contactId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "VALIDATED",
+                      "RESOLVED",
+                      "NEEDS_REVIEW"
+                    ]
+                  },
+                  "reasonCode": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "IdentityCandidate": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source",
+          "sourceType",
+          "role",
+          "name",
+          "email",
+          "customerName",
+          "contactName",
+          "companyName",
+          "confidence",
+          "reasonCodes",
+          "customerId",
+          "contactId",
+          "coreBridgeContactId"
+        ],
+        "properties": {
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "role": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "email"
+          },
+          "customerName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "contactName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "companyName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "confidence": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "reasonCodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "customerId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "contactId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "coreBridgeContactId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          }
+        }
+      },
+      "IdentityCorrectionSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schemaVersion",
+          "customer",
+          "contact",
+          "location",
+          "customerProfile",
+          "coreBridgeAccount"
+        ],
+        "properties": {
+          "schemaVersion": {
+            "type": "string",
+            "const": "ws4_identity_correction.v1"
+          },
+          "customer": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "mode",
+                  "customerId",
+                  "name",
+                  "email",
+                  "companyName"
+                ],
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "existing_customer",
+                      "new_customer"
+                    ]
+                  },
+                  "customerId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "email": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "email"
+                  },
+                  "companyName": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "contact": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "mode",
+                  "customerId",
+                  "coreBridgeContactId",
+                  "name",
+                  "email"
+                ],
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "existing_contact",
+                      "new_contact"
+                    ]
+                  },
+                  "customerId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "coreBridgeContactId": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 1
+                  },
+                  "name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "email": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "email"
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "location": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "coreBridgeLocationId"
+                ],
+                "properties": {
+                  "coreBridgeLocationId": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "customerProfile": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "salespersonId"
+                ],
+                "properties": {
+                  "salespersonId": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 1
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "coreBridgeAccount": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "mode",
+                  "customerId"
+                ],
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "link_existing",
+                      "create_new"
+                    ]
+                  },
+                  "customerId": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 1
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "IdentityHandoffSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "b2CustomerAction",
+          "b2OrderAction",
+          "coreBridgeAccountAction",
+          "coreBridgeContactAction",
+          "reasonCodes"
+        ],
+        "properties": {
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "b2CustomerAction": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "b2OrderAction": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "coreBridgeAccountAction": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "coreBridgeContactAction": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reasonCodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "IdentityReviewDetail": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reviewKind",
+          "sourceContext",
+          "selectedCandidate",
+          "candidateIdentities",
+          "rejectedCandidates",
+          "reasonCodes",
+          "holdReasonCodes",
+          "coreBridgeAccountCandidates",
+          "attachments",
+          "allowedActions",
+          "evaluation"
+        ],
+        "properties": {
+          "reviewKind": {
+            "type": "string",
+            "enum": [
+              "ATTACHMENT_EVIDENCE",
+              "CUSTOMER_CONFIRMATION",
+              "AMBIGUOUS_CONTACT",
+              "MISSING_CONTACT_DATA",
+              "STALE_CONTACT_INFO",
+              "DUPLICATE_CONTACT",
+              "MISSING_LOCATION",
+              "MISSING_CUSTOMER",
+              "DUPLICATE_RFQ",
+              "COMMERCIAL_DOCUMENT"
+            ]
+          },
+          "sourceContext": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "rawOrderDataId",
+              "source",
+              "status",
+              "recipient",
+              "receivedAt",
+              "processedAt"
+            ],
+            "properties": {
+              "rawOrderDataId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "source": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "status": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "recipient": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "receivedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "processedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              }
+            }
+          },
+          "selectedCandidate": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/IdentityCandidate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "candidateIdentities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IdentityCandidate"
+            }
+          },
+          "rejectedCandidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IdentityCandidate"
+            }
+          },
+          "reasonCodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "holdReasonCodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "coreBridgeAccountCandidates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "name",
+                "email",
+                "phone"
+              ],
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "name": {
+                  "type": "string"
+                },
+                "email": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "email"
+                },
+                "phone": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "handle",
+                "index",
+                "name",
+                "mimeType",
+                "size",
+                "isImage"
+              ],
+              "properties": {
+                "handle": {
+                  "type": "string"
+                },
+                "index": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "name": {
+                  "type": "string"
+                },
+                "mimeType": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "size": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 0
+                },
+                "isImage": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "allowedActions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "select_existing_customer",
+                "create_customer",
+                "select_existing_contact",
+                "create_contact",
+                "select_location"
+              ]
+            }
+          },
+          "evaluation": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "initialDecision",
+              "operatorCorrection",
+              "handoffOutcome"
+            ],
+            "properties": {
+              "initialDecision": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "status",
+                      "confidence",
+                      "sourceType",
+                      "reasonCodes",
+                      "holdReasonCodes"
+                    ],
+                    "properties": {
+                      "status": {
+                        "type": "string"
+                      },
+                      "confidence": {
+                        "type": "number"
+                      },
+                      "sourceType": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "reasonCodes": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "holdReasonCodes": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "operatorCorrection": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/IdentityCorrectionSummary"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "handoffOutcome": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/IdentityHandoffSummary"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "IntakeReviewContext": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "intakeId",
+          "preOrder",
+          "draftRevision",
+          "review",
+          "customerReview",
+          "allowedActions",
+          "operatorReviewRequired",
+          "coreBridgePushAllowed"
+        ],
+        "properties": {
+          "intakeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "preOrder": {
+            "type": "boolean",
+            "const": true
+          },
+          "draftRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "review": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "kind",
+              "status",
+              "reviewPath"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "reviewPath": {
+                "type": "string"
+              }
+            }
+          },
+          "customerReview": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "target",
+                  "id",
+                  "status",
+                  "reasonCode",
+                  "reasonLabel",
+                  "identity"
+                ],
+                "properties": {
+                  "target": {
+                    "$ref": "#/components/schemas/CustomerReviewTarget"
+                  },
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "reasonCode": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "reasonLabel": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "identity": {
+                    "$ref": "#/components/schemas/IdentityReviewDetail"
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "allowedActions": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "enum": [
+                "RESOLVE_CUSTOMER_REVIEW"
+              ]
+            }
+          },
+          "operatorReviewRequired": {
+            "type": "boolean",
+            "const": true
+          },
+          "coreBridgePushAllowed": {
+            "type": "boolean",
+            "const": false
+          }
+        }
+      },
+      "Rfq": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "rfqId",
+          "rfqNumber",
+          "status",
+          "draftRevision",
+          "createdAt",
+          "updatedAt",
+          "coreBridgePushAllowed"
+        ],
+        "properties": {
+          "rfqId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rfqNumber": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "draftRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "coreBridgePushAllowed": {
+            "type": "boolean",
+            "const": false
+          }
+        }
+      },
+      "LineItemSetTarget": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "id",
+          "version"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "LINE_ITEM_SET"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        }
+      },
+      "CustomerReviewTarget": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "id",
+          "version"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "CUSTOMER_REVIEW"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        }
+      },
+      "CommercialDocumentTarget": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "id",
+          "version"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "COMMERCIAL_DOCUMENT"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        }
+      },
+      "QuickProductBundleTarget": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "id",
+          "version"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "QUICKPRODUCT_BUNDLE"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        }
+      },
+      "DraftTarget": {
+        "description": "Copy one complete versioned target unchanged from the latest review context.",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/LineItemSetTarget"
+          },
+          {
+            "$ref": "#/components/schemas/CustomerReviewTarget"
+          },
+          {
+            "$ref": "#/components/schemas/CommercialDocumentTarget"
+          },
+          {
+            "$ref": "#/components/schemas/QuickProductBundleTarget"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "LINE_ITEM_SET": "#/components/schemas/LineItemSetTarget",
+            "CUSTOMER_REVIEW": "#/components/schemas/CustomerReviewTarget",
+            "COMMERCIAL_DOCUMENT": "#/components/schemas/CommercialDocumentTarget",
+            "QUICKPRODUCT_BUNDLE": "#/components/schemas/QuickProductBundleTarget"
+          }
+        }
+      },
+      "DraftActionEvidence": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 5,
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "description": "One to five concrete facts from the current RFQ or synchronized catalog."
+      },
+      "ReviewAddress": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "line1",
+          "line2",
+          "city",
+          "state",
+          "zip",
+          "country"
+        ],
+        "properties": {
+          "line1": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          },
+          "line2": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          },
+          "city": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 200
+          },
+          "state": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 100
+          },
+          "zip": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 40
+          },
+          "country": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 100
+          }
+        }
+      },
+      "ReviewReference": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          }
+        }
+      },
+      "ExistingCustomerCorrection": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mode",
+          "customerId"
+        ],
+        "properties": {
+          "mode": {
+            "type": "string",
+            "const": "existing_customer"
+          },
+          "customerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "email",
+            "maxLength": 320
+          }
+        }
+      },
+      "NewCustomerCorrection": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mode",
+          "name",
+          "email"
+        ],
+        "properties": {
+          "mode": {
+            "type": "string",
+            "const": "new_customer"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 320
+          },
+          "companyName": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 300
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 100
+          }
+        }
+      },
+      "ExistingContactCorrection": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mode",
+          "customerId"
+        ],
+        "properties": {
+          "mode": {
+            "type": "string",
+            "const": "existing_contact"
+          },
+          "customerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "coreBridgeContactId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 300
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "email",
+            "maxLength": 320
+          }
+        }
+      },
+      "CoreBridgeContactCorrection": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mode",
+          "coreBridgeContactId"
+        ],
+        "properties": {
+          "mode": {
+            "type": "string",
+            "const": "corebridge_contact"
+          },
+          "coreBridgeContactId": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "email",
+            "maxLength": 320
+          }
+        }
+      },
+      "NewContactCorrection": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mode",
+          "name",
+          "email"
+        ],
+        "properties": {
+          "mode": {
+            "type": "string",
+            "const": "new_contact"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 320
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 100
+          }
+        }
+      },
+      "ExistingCoreBridgeAccountCorrection": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mode",
+          "customerId"
+        ],
+        "properties": {
+          "mode": {
+            "type": "string",
+            "const": "link_existing"
+          },
+          "customerId": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "CreateCoreBridgeAccountCorrection": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mode"
+        ],
+        "properties": {
+          "mode": {
+            "type": "string",
+            "const": "create_new"
+          }
+        }
+      },
+      "CustomerProfileCorrection": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "contactName"
+        ],
+        "properties": {
+          "contactName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "companyName": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 300
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 100
+          },
+          "billingAddress": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReviewAddress"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "shippingAddress": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReviewAddress"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "industry": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReviewReference"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "origination": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReviewReference"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "salespersonId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          }
+        }
+      },
+      "CustomerCorrection": {
+        "type": "object",
+        "additionalProperties": false,
+        "anyOf": [
+          {
+            "required": [
+              "customer"
+            ],
+            "properties": {
+              "customer": {
+                "not": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "required": [
+              "contact"
+            ],
+            "properties": {
+              "contact": {
+                "not": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "required": [
+              "location"
+            ],
+            "properties": {
+              "location": {
+                "not": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "required": [
+              "customerProfile"
+            ],
+            "properties": {
+              "customerProfile": {
+                "not": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "required": [
+              "coreBridgeAccount"
+            ],
+            "properties": {
+              "coreBridgeAccount": {
+                "not": {
+                  "type": "null"
+                }
+              }
+            }
+          }
+        ],
+        "properties": {
+          "customer": {
+            "oneOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/ExistingCustomerCorrection"
+                  },
+                  {
+                    "$ref": "#/components/schemas/NewCustomerCorrection"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "mode",
+                  "mapping": {
+                    "existing_customer": "#/components/schemas/ExistingCustomerCorrection",
+                    "new_customer": "#/components/schemas/NewCustomerCorrection"
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "contact": {
+            "oneOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/ExistingContactCorrection"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CoreBridgeContactCorrection"
+                  },
+                  {
+                    "$ref": "#/components/schemas/NewContactCorrection"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "mode",
+                  "mapping": {
+                    "existing_contact": "#/components/schemas/ExistingContactCorrection",
+                    "corebridge_contact": "#/components/schemas/CoreBridgeContactCorrection",
+                    "new_contact": "#/components/schemas/NewContactCorrection"
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "location": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "coreBridgeLocationId"
+                ],
+                "properties": {
+                  "coreBridgeLocationId": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "customerProfile": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CustomerProfileCorrection"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "coreBridgeAccount": {
+            "oneOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/ExistingCoreBridgeAccountCorrection"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CreateCoreBridgeAccountCorrection"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "mode",
+                  "mapping": {
+                    "link_existing": "#/components/schemas/ExistingCoreBridgeAccountCorrection",
+                    "create_new": "#/components/schemas/CreateCoreBridgeAccountCorrection"
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "CommercialCorrection": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "description",
+          "quantity",
+          "unitPrice"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000
+          },
+          "unitPrice": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 200000000
+          }
+        }
+      },
+      "MatchQuickProductAction": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Selects one synchronized QuickProduct for an existing line-item decision.",
+        "required": [
+          "type",
+          "decisionId",
+          "decisionUpdatedAt",
+          "quickProductId",
+          "quickProductUpdatedAt",
+          "reason",
+          "evidence"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "MATCH_QUICKPRODUCT"
+          },
+          "decisionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "decisionUpdatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "quickProductId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quickProductUpdatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/DraftActionEvidence"
+          }
+        }
+      },
+      "AddCustomLineAction": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Adds a new operator-visible custom line without inventing a missing price.",
+        "required": [
+          "type",
+          "lineItemsFingerprint",
+          "description",
+          "quantity",
+          "unitPrice",
+          "reason",
+          "evidence"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "ADD_CUSTOM_LINE"
+          },
+          "lineItemsFingerprint": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000
+          },
+          "unitPrice": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "maximum": 10000000
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/DraftActionEvidence"
+          }
+        }
+      },
+      "SendAsCustomLineAction": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Keeps the extracted source line but sends it as a custom CoreBridge line.",
+        "required": [
+          "type",
+          "decisionId",
+          "decisionUpdatedAt",
+          "unitPrice",
+          "reason",
+          "evidence"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "SEND_AS_CUSTOM_LINE"
+          },
+          "decisionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "decisionUpdatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "unitPrice": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "maximum": 10000000
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/DraftActionEvidence"
+          }
+        }
+      },
+      "CorrectLineItemAction": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Replaces one source line with corrected description and quantity, then rebuilds its match decision. Read the latest review context and apply the desired QuickProduct, custom-line price, catalog-gap, or review action to the replacement.",
+        "required": [
+          "type",
+          "decisionId",
+          "decisionUpdatedAt",
+          "description",
+          "quantity",
+          "reason",
+          "evidence"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "CORRECT_LINE_ITEM"
+          },
+          "decisionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "decisionUpdatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/DraftActionEvidence"
+          }
+        }
+      },
+      "ExcludeLineItemAction": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Excludes an extracted line from the RFQ draft.",
+        "required": [
+          "type",
+          "decisionId",
+          "decisionUpdatedAt",
+          "reason",
+          "evidence"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "EXCLUDE_LINE_ITEM"
+          },
+          "decisionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "decisionUpdatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/DraftActionEvidence"
+          }
+        }
+      },
+      "SetExplicitPriceAction": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Selects a QuickProduct while recording an explicit B2 Portal unit price.",
+        "required": [
+          "type",
+          "decisionId",
+          "decisionUpdatedAt",
+          "quickProductId",
+          "quickProductUpdatedAt",
+          "unitPrice",
+          "reason",
+          "evidence"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "SET_EXPLICIT_PRICE"
+          },
+          "decisionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "decisionUpdatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "quickProductId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quickProductUpdatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "unitPrice": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 10000000
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/DraftActionEvidence"
+          }
+        }
+      },
+      "MarkCatalogGapAction": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Marks a product requirement that the synchronized catalog cannot represent.",
+        "required": [
+          "type",
+          "decisionId",
+          "decisionUpdatedAt",
+          "missingProductDescription",
+          "reason",
+          "evidence"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "MARK_CATALOG_GAP"
+          },
+          "decisionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "decisionUpdatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "missingProductDescription": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/DraftActionEvidence"
+          }
+        }
+      },
+      "HoldForReviewAction": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Leaves one line decision in explicit operator review.",
+        "required": [
+          "type",
+          "decisionId",
+          "decisionUpdatedAt",
+          "reason",
+          "evidence"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "HOLD_FOR_REVIEW"
+          },
+          "decisionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "decisionUpdatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/DraftActionEvidence"
+          }
+        }
+      },
+      "ResolveCustomerReviewAction": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Applies a tenant-bound customer, contact, account, location, or profile correction.",
+        "required": [
+          "type",
+          "correction",
+          "reason",
+          "evidence"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "RESOLVE_CUSTOMER_REVIEW"
+          },
+          "correction": {
+            "$ref": "#/components/schemas/CustomerCorrection"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/DraftActionEvidence"
+          }
+        }
+      },
+      "ReconcileCommercialDocumentAction": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Reconciles reviewed commercial-document rows before selecting the authoritative lines.",
+        "required": [
+          "type",
+          "corrections",
+          "selectedLineItemIds",
+          "reason",
+          "evidence"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "RECONCILE_COMMERCIAL_DOCUMENT"
+          },
+          "corrections": {
+            "type": "array",
+            "maxItems": 500,
+            "items": {
+              "$ref": "#/components/schemas/CommercialCorrection"
+            }
+          },
+          "selectedLineItemIds": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 500,
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/DraftActionEvidence"
+          }
+        }
+      },
+      "ResolveQuickProductBundleAction": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Approves a valid bundle or returns the RFQ to per-line review.",
+        "required": [
+          "type",
+          "action",
+          "reason",
+          "evidence"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "RESOLVE_QUICKPRODUCT_BUNDLE"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "approve_bundle",
+              "review_individual_lines"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/DraftActionEvidence"
+          }
+        }
+      },
+      "LineItemDraftAction": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/MatchQuickProductAction"
+          },
+          {
+            "$ref": "#/components/schemas/AddCustomLineAction"
+          },
+          {
+            "$ref": "#/components/schemas/SendAsCustomLineAction"
+          },
+          {
+            "$ref": "#/components/schemas/CorrectLineItemAction"
+          },
+          {
+            "$ref": "#/components/schemas/ExcludeLineItemAction"
+          },
+          {
+            "$ref": "#/components/schemas/SetExplicitPriceAction"
+          },
+          {
+            "$ref": "#/components/schemas/MarkCatalogGapAction"
+          },
+          {
+            "$ref": "#/components/schemas/HoldForReviewAction"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "MATCH_QUICKPRODUCT": "#/components/schemas/MatchQuickProductAction",
+            "ADD_CUSTOM_LINE": "#/components/schemas/AddCustomLineAction",
+            "SEND_AS_CUSTOM_LINE": "#/components/schemas/SendAsCustomLineAction",
+            "CORRECT_LINE_ITEM": "#/components/schemas/CorrectLineItemAction",
+            "EXCLUDE_LINE_ITEM": "#/components/schemas/ExcludeLineItemAction",
+            "SET_EXPLICIT_PRICE": "#/components/schemas/SetExplicitPriceAction",
+            "MARK_CATALOG_GAP": "#/components/schemas/MarkCatalogGapAction",
+            "HOLD_FOR_REVIEW": "#/components/schemas/HoldForReviewAction"
+          }
+        }
+      },
+      "LineItemDraftActionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "locationId",
+          "expectedRevision",
+          "target",
+          "action"
+        ],
+        "properties": {
+          "locationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "target": {
+            "$ref": "#/components/schemas/LineItemSetTarget"
+          },
+          "action": {
+            "$ref": "#/components/schemas/LineItemDraftAction"
+          }
+        }
+      },
+      "CustomerReviewDraftActionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "locationId",
+          "expectedRevision",
+          "target",
+          "action"
+        ],
+        "properties": {
+          "locationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "target": {
+            "$ref": "#/components/schemas/CustomerReviewTarget"
+          },
+          "action": {
+            "$ref": "#/components/schemas/ResolveCustomerReviewAction"
+          }
+        }
+      },
+      "CommercialDocumentDraftActionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "locationId",
+          "expectedRevision",
+          "target",
+          "action"
+        ],
+        "properties": {
+          "locationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "target": {
+            "$ref": "#/components/schemas/CommercialDocumentTarget"
+          },
+          "action": {
+            "$ref": "#/components/schemas/ReconcileCommercialDocumentAction"
+          }
+        }
+      },
+      "QuickProductBundleDraftActionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "locationId",
+          "expectedRevision",
+          "target",
+          "action"
+        ],
+        "properties": {
+          "locationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "target": {
+            "$ref": "#/components/schemas/QuickProductBundleTarget"
+          },
+          "action": {
+            "$ref": "#/components/schemas/ResolveQuickProductBundleAction"
+          }
+        }
+      },
+      "ReviewSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ready",
+          "matchedNeedsReview",
+          "custom",
+          "excluded",
+          "held",
+          "uninitialized",
+          "blockerCodes",
+          "readyForOperatorPushReview"
+        ],
+        "properties": {
+          "ready": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "matchedNeedsReview": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "custom": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "excluded": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "held": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "uninitialized": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "blockerCodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "readyForOperatorPushReview": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ReviewQuickProduct": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "version",
+          "name",
+          "category",
+          "summary",
+          "description",
+          "retailPriceKnown",
+          "retailPrice",
+          "coreBridgeProductId",
+          "externalId",
+          "partCount",
+          "partHighlights"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "name": {
+            "type": "string"
+          },
+          "category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "retailPriceKnown": {
+            "type": "boolean"
+          },
+          "retailPrice": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "coreBridgeProductId": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "externalId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "partCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "partHighlights": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "partName",
+                "partDisplayName",
+                "materialType",
+                "color",
+                "finish",
+                "thickness",
+                "width",
+                "height",
+                "depth",
+                "measurementUnit"
+              ],
+              "properties": {
+                "partName": {
+                  "type": "string"
+                },
+                "partDisplayName": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "materialType": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "color": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "finish": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "thickness": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "width": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "height": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "depth": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "measurementUnit": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "ReviewQuickProductCandidate": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "quickProductId",
+          "externalProductId",
+          "corebridgeProductId",
+          "productName",
+          "retailPrice",
+          "productCategory",
+          "matchType",
+          "confidence",
+          "similarity",
+          "rank",
+          "selected",
+          "rejectedReason",
+          "product"
+        ],
+        "properties": {
+          "quickProductId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "externalProductId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "corebridgeProductId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "productName": {
+            "type": "string"
+          },
+          "retailPrice": {
+            "type": "number"
+          },
+          "productCategory": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "matchType": {
+            "type": "string",
+            "enum": [
+              "exact",
+              "embedding",
+              "ai"
+            ]
+          },
+          "confidence": {
+            "type": "number"
+          },
+          "similarity": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "rank": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "selected": {
+            "type": "boolean"
+          },
+          "rejectedReason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "product": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReviewQuickProduct"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "ReviewLine": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "quantity",
+          "price",
+          "priceOrigin",
+          "provenance",
+          "sourceLineItemId",
+          "approvedSend",
+          "decision"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "price": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "priceOrigin": {
+            "type": "string"
+          },
+          "provenance": {
+            "type": "string"
+          },
+          "sourceLineItemId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "approvedSend": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "mode",
+              "quantity",
+              "unitPrice",
+              "total",
+              "pricingAuthority"
+            ],
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "custom_line",
+                  "quickproduct",
+                  "excluded",
+                  "unresolved"
+                ]
+              },
+              "quantity": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "unitPrice": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "exclusiveMinimum": 0
+              },
+              "total": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "exclusiveMinimum": 0
+              },
+              "pricingAuthority": {
+                "type": "string"
+              }
+            }
+          },
+          "decision": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "version",
+              "status",
+              "identifierMode",
+              "pricingAuthority",
+              "unitPriceSource",
+              "totalPriceSource",
+              "matchType",
+              "matchConfidence",
+              "holdReason",
+              "holdMessage",
+              "dimensionsComparison",
+              "selectedProduct",
+              "candidates",
+              "rejectedCandidates",
+              "latestResolutionId",
+              "resolutionCount"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "version": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "status": {
+                "type": "string"
+              },
+              "identifierMode": {
+                "type": "string"
+              },
+              "pricingAuthority": {
+                "type": "string"
+              },
+              "unitPriceSource": {
+                "type": "string"
+              },
+              "totalPriceSource": {
+                "type": "string"
+              },
+              "matchType": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "matchConfidence": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "holdReason": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "holdMessage": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "dimensionsComparison": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/ReviewDimensionsComparison"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "selectedProduct": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/ReviewQuickProduct"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "candidates": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ReviewQuickProductCandidate"
+                }
+              },
+              "rejectedCandidates": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ReviewQuickProductCandidate"
+                }
+              },
+              "latestResolutionId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "resolutionCount": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      },
+      "ReviewDimensions": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "width",
+          "height",
+          "depth",
+          "unit"
+        ],
+        "properties": {
+          "width": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "height": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "depth": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "unit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ReviewDimensionsComparison": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "requested",
+          "matched",
+          "reason"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "not_provided",
+              "not_compared",
+              "match",
+              "mismatch"
+            ]
+          },
+          "requested": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReviewDimensions"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "matched": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReviewDimensions"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ReviewOrder": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "orderNo",
+          "status",
+          "coreBridgeLocationId",
+          "customer",
+          "coreBridgeBinding"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "orderNo": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "coreBridgeLocationId": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "customer": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "name",
+                  "email",
+                  "contactNo",
+                  "companyName",
+                  "coreBridgeBindings"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string"
+                  },
+                  "contactNo": {
+                    "type": "string"
+                  },
+                  "companyName": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "coreBridgeBindings": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "coreBridgeCustomerId",
+                        "coreBridgeContactId",
+                        "syncStatus",
+                        "updatedAt"
+                      ],
+                      "properties": {
+                        "coreBridgeCustomerId": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "coreBridgeContactId": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "syncStatus": {
+                          "type": "string"
+                        },
+                        "updatedAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "coreBridgeBinding": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "syncStatus",
+                  "coreBridgeOrderId",
+                  "coreBridgeEstimateId"
+                ],
+                "properties": {
+                  "syncStatus": {
+                    "type": "string"
+                  },
+                  "coreBridgeOrderId": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "coreBridgeEstimateId": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "ReviewCustomerResolution": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "target",
+          "id",
+          "kind",
+          "status",
+          "version",
+          "reasonCode",
+          "reasonLabel"
+        ],
+        "properties": {
+          "target": {
+            "$ref": "#/components/schemas/DraftTarget"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reasonCode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reasonLabel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ReviewCommercialDocument": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "target",
+          "id",
+          "status",
+          "version",
+          "reasonCode",
+          "reasonLabel",
+          "document"
+        ],
+        "properties": {
+          "target": {
+            "$ref": "#/components/schemas/DraftTarget"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reasonCode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reasonLabel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "document": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "ReviewBundleDecision": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "target",
+          "id",
+          "version",
+          "status",
+          "resolutionAction",
+          "selectedQuickProductId",
+          "confidence",
+          "evidence",
+          "coveredLineItemIds",
+          "reviewReason"
+        ],
+        "properties": {
+          "target": {
+            "$ref": "#/components/schemas/DraftTarget"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string"
+          },
+          "resolutionAction": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "selectedQuickProductId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "confidence": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "coveredLineItemIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "reviewReason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ReviewContext": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "rfqId",
+          "draftRevision",
+          "revision",
+          "summary",
+          "order",
+          "lineItemsFingerprint",
+          "lineItemSetTarget",
+          "decisionsInitialized",
+          "decisionInitialization",
+          "customerReview",
+          "commercialDocumentReview",
+          "bundleDecision",
+          "lines",
+          "catalog",
+          "allowedActions",
+          "operatorMustAccept",
+          "coreBridgePushAllowed",
+          "reviewPath"
+        ],
+        "properties": {
+          "rfqId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "draftRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "revision": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/ReviewSummary"
+          },
+          "order": {
+            "$ref": "#/components/schemas/ReviewOrder"
+          },
+          "lineItemsFingerprint": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "lineItemSetTarget": {
+            "$ref": "#/components/schemas/DraftTarget"
+          },
+          "decisionsInitialized": {
+            "type": "boolean"
+          },
+          "decisionInitialization": {
+            "type": "string",
+            "enum": [
+              "initialized",
+              "nothing_missing",
+              "bundle_active",
+              "sync_unavailable",
+              "stale_snapshot",
+              "lock_unavailable",
+              "not_needed",
+              "retryable_error"
+            ]
+          },
+          "customerReview": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReviewCustomerResolution"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "commercialDocumentReview": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReviewCommercialDocument"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "bundleDecision": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReviewBundleDecision"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewLine"
+            }
+          },
+          "catalog": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "status",
+                  "lastSucceededAt",
+                  "activeProductCount"
+                ],
+                "properties": {
+                  "status": {
+                    "type": "string"
+                  },
+                  "lastSucceededAt": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date-time"
+                  },
+                  "activeProductCount": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "allowedActions": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "enum": [
+                "MATCH_QUICKPRODUCT",
+                "ADD_CUSTOM_LINE",
+                "SEND_AS_CUSTOM_LINE",
+                "CORRECT_LINE_ITEM",
+                "EXCLUDE_LINE_ITEM",
+                "SET_EXPLICIT_PRICE",
+                "MARK_CATALOG_GAP",
+                "HOLD_FOR_REVIEW",
+                "RESOLVE_CUSTOMER_REVIEW",
+                "RECONCILE_COMMERCIAL_DOCUMENT",
+                "RESOLVE_QUICKPRODUCT_BUNDLE"
+              ]
+            }
+          },
+          "operatorMustAccept": {
+            "type": "boolean",
+            "const": false
+          },
+          "coreBridgePushAllowed": {
+            "type": "boolean",
+            "const": false
+          },
+          "reviewPath": {
+            "type": "string"
+          }
+        }
+      },
+      "CatalogState": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source",
+          "liveCoreBridgeRequest",
+          "generation",
+          "status",
+          "lastSucceededAt",
+          "activeProductCount",
+          "upstreamProductCount",
+          "failureCode"
+        ],
+        "properties": {
+          "source": {
+            "type": "string",
+            "const": "SYNCED_COREBRIDGE_V2_CATALOG"
+          },
+          "liveCoreBridgeRequest": {
+            "type": "boolean",
+            "const": false
+          },
+          "generation": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "lastSucceededAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "activeProductCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "upstreamProductCount": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "failureCode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "QuickProductPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "catalog",
+          "products",
+          "hasMore",
+          "nextCursor"
+        ],
+        "properties": {
+          "catalog": {
+            "$ref": "#/components/schemas/CatalogState"
+          },
+          "products": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuickProduct"
+            }
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "QuickProduct": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "version",
+          "coreBridgeProductId",
+          "externalId",
+          "externalIdName",
+          "name",
+          "category",
+          "description",
+          "summary",
+          "retailPriceKnown",
+          "retailPrice",
+          "productQuantity",
+          "ecommerceEnabled",
+          "categories",
+          "accountRestricted",
+          "customerAccounts",
+          "partCount",
+          "partsFetchedAt",
+          "coreBridgeModifiedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "coreBridgeProductId": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "externalId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "externalIdName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "retailPriceKnown": {
+            "type": "boolean"
+          },
+          "retailPrice": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "productQuantity": {
+            "type": "integer"
+          },
+          "ecommerceEnabled": {
+            "type": "boolean"
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "accountRestricted": {
+            "type": "boolean"
+          },
+          "customerAccounts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "accountId",
+                "companyName"
+              ],
+              "properties": {
+                "accountId": {
+                  "type": "integer"
+                },
+                "companyName": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "partCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "partsFetchedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "coreBridgeModifiedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "QuickProductPart": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "version",
+          "corebridgePartLineId",
+          "lineItemNumber",
+          "partId",
+          "partName",
+          "partDisplayName",
+          "partNumber",
+          "quantity",
+          "width",
+          "height",
+          "depth",
+          "measurementUnit",
+          "partDescription",
+          "printOnBothSides",
+          "color",
+          "finish",
+          "thickness",
+          "weight",
+          "materialType"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "corebridgePartLineId": {
+            "type": "integer"
+          },
+          "lineItemNumber": {
+            "type": "integer"
+          },
+          "partId": {
+            "type": "integer"
+          },
+          "partName": {
+            "type": "string"
+          },
+          "partDisplayName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "partNumber": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quantity": {
+            "type": "integer"
+          },
+          "width": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "height": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "depth": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "measurementUnit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "partDescription": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "printOnBothSides": {
+            "type": "boolean"
+          },
+          "color": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "finish": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "thickness": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "weight": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "materialType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "QuickProductDetailProduct": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "version",
+          "coreBridgeProductId",
+          "externalId",
+          "externalIdName",
+          "name",
+          "category",
+          "description",
+          "summary",
+          "retailPriceKnown",
+          "retailPrice",
+          "productQuantity",
+          "ecommerceEnabled",
+          "categories",
+          "accountRestricted",
+          "customerAccounts",
+          "partCount",
+          "partsFetchedAt",
+          "coreBridgeModifiedAt",
+          "productionDesignNo",
+          "salesNote",
+          "customer",
+          "vendorName",
+          "discountType",
+          "isVended",
+          "productSub",
+          "productCategoryId",
+          "isGlobal",
+          "coreBridgeCreatedAt",
+          "parts",
+          "hasMoreParts",
+          "nextPartCursor"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "coreBridgeProductId": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "externalId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "externalIdName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "retailPriceKnown": {
+            "type": "boolean"
+          },
+          "retailPrice": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "productQuantity": {
+            "type": "integer"
+          },
+          "ecommerceEnabled": {
+            "type": "boolean"
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "accountRestricted": {
+            "type": "boolean"
+          },
+          "customerAccounts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "accountId",
+                "companyName"
+              ],
+              "properties": {
+                "accountId": {
+                  "type": "integer"
+                },
+                "companyName": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "partCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "partsFetchedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "coreBridgeModifiedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "productionDesignNo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "salesNote": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "customer": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "vendorName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "discountType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "isVended": {
+            "type": "boolean"
+          },
+          "productSub": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "productCategoryId": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "isGlobal": {
+            "type": "boolean"
+          },
+          "coreBridgeCreatedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "parts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuickProductPart"
+            }
+          },
+          "hasMoreParts": {
+            "type": "boolean"
+          },
+          "nextPartCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "QuickProductDetail": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "catalog",
+          "product"
+        ],
+        "properties": {
+          "catalog": {
+            "$ref": "#/components/schemas/CatalogState"
+          },
+          "product": {
+            "$ref": "#/components/schemas/QuickProductDetailProduct"
+          }
+        }
+      },
+      "CatalogMatchedPart": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "partName",
+          "partNumber",
+          "matchedFields"
+        ],
+        "properties": {
+          "partName": {
+            "type": "string"
+          },
+          "partNumber": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "matchedFields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "CatalogSearchProduct": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "version",
+          "coreBridgeProductId",
+          "externalId",
+          "externalIdName",
+          "name",
+          "category",
+          "description",
+          "summary",
+          "retailPriceKnown",
+          "retailPrice",
+          "productQuantity",
+          "ecommerceEnabled",
+          "categories",
+          "accountRestricted",
+          "customerAccounts",
+          "partCount",
+          "partsFetchedAt",
+          "coreBridgeModifiedAt",
+          "matchedFields",
+          "matchedParts"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "coreBridgeProductId": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "externalId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "externalIdName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "retailPriceKnown": {
+            "type": "boolean"
+          },
+          "retailPrice": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "productQuantity": {
+            "type": "integer"
+          },
+          "ecommerceEnabled": {
+            "type": "boolean"
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "accountRestricted": {
+            "type": "boolean"
+          },
+          "customerAccounts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "accountId",
+                "companyName"
+              ],
+              "properties": {
+                "accountId": {
+                  "type": "integer"
+                },
+                "companyName": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "partCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "partsFetchedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "coreBridgeModifiedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "matchedFields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "matchedParts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CatalogMatchedPart"
+            }
+          }
+        }
+      },
+      "CatalogSearchResults": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "catalog",
+          "products"
+        ],
+        "properties": {
+          "catalog": {
+            "$ref": "#/components/schemas/CatalogState"
+          },
+          "products": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CatalogSearchProduct"
+            }
+          }
+        }
+      },
+      "DraftActionRequest": {
+        "description": "The versioned target determines which discriminated action family is accepted.",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/LineItemDraftActionRequest"
+          },
+          {
+            "$ref": "#/components/schemas/CustomerReviewDraftActionRequest"
+          },
+          {
+            "$ref": "#/components/schemas/CommercialDocumentDraftActionRequest"
+          },
+          {
+            "$ref": "#/components/schemas/QuickProductBundleDraftActionRequest"
+          }
+        ]
+      },
+      "DraftActionResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "rfqId",
+          "draftRevision",
+          "actionType",
+          "reviewPath",
+          "reviewUrl",
+          "coreBridgePushAllowed"
+        ],
+        "properties": {
+          "rfqId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "draftRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "actionType": {
+            "type": "string",
+            "enum": [
+              "MATCH_QUICKPRODUCT",
+              "ADD_CUSTOM_LINE",
+              "SEND_AS_CUSTOM_LINE",
+              "CORRECT_LINE_ITEM",
+              "EXCLUDE_LINE_ITEM",
+              "SET_EXPLICIT_PRICE",
+              "MARK_CATALOG_GAP",
+              "HOLD_FOR_REVIEW",
+              "RESOLVE_CUSTOMER_REVIEW",
+              "RECONCILE_COMMERCIAL_DOCUMENT",
+              "RESOLVE_QUICKPRODUCT_BUNDLE"
+            ]
+          },
+          "reviewPath": {
+            "type": "string"
+          },
+          "reviewUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "coreBridgePushAllowed": {
+            "type": "boolean",
+            "const": false
+          }
+        }
+      },
+      "IntakeDraftActionResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "intakeId",
+          "draftRevision",
+          "actionType",
+          "reviewPath",
+          "reviewUrl",
+          "coreBridgePushAllowed"
+        ],
+        "properties": {
+          "intakeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "draftRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "actionType": {
+            "type": "string",
+            "const": "RESOLVE_CUSTOMER_REVIEW"
+          },
+          "reviewPath": {
+            "type": "string"
+          },
+          "reviewUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "coreBridgePushAllowed": {
+            "type": "boolean",
+            "const": false
+          }
+        }
+      }
+    }
+  }
+}
