@@ -14,7 +14,7 @@ This repository contains OpenAPI specifications for the B2 Portal Developer API.
 
 The `latest` directory contains the current generally available contract for B2 Portal Developer API V1. Use these files to inspect the API, validate an integration, or generate client code.
 
-The public contract includes tenant- and location-scoped RFQ intake, customer account and contact lookup, attachment upload, synchronized QuickProduct catalog reads, RFQ review context, and draft actions. The Developer API never pushes RFQs to CoreBridge. It returns operator review context, and an operator performs the push in B2 Portal.
+The public contract includes tenant- and location-scoped RFQ intake, customer account and contact lookup, attachment upload, synchronized QuickProduct catalog reads, RFQ review context, draft actions, lifecycle webhooks, and an explicitly authorized push to CoreBridge. Push requires the separately granted `corebridge:push` permission and the current review target. Without that permission, an operator performs the push in B2 Portal.
 
 ## File formats
 

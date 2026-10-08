@@ -1,11 +1,11 @@
 openapi: 3.1.0
 info:
   title: B2 Portal Developer API
-  version: 0.1.0
+  version: 0.2.0
   license:
     name: Proprietary
     url: https://b2portal.com/terms
-  description: Tenant- and location-scoped RFQ intake, catalog, and draft-triage API. V1 never pushes an RFQ to CoreBridge; the response returns operator review context instead.
+  description: Tenant- and location-scoped RFQ intake, catalog, draft triage, and explicitly authorized CoreBridge push. Push requires a separately granted corebridge:push permission and a current review target.
 servers:
   - url: https://api.b2portal.com/api/v1
     description: Production
@@ -61,7 +61,7 @@ paths:
       tags:
         - Developer API V1
       summary: Search customer accounts
-      description: Searches accounts in one granted CoreBridge location. Results are live, bounded, and cursor-paginated; V1 does not provide an unbounded account export.
+      description: Searches accounts in one granted CoreBridge location. Comma-delimited names use a literal company-name phrase for provider candidate retrieval, excluding suffix-only phrases when possible; results are then filtered against every normalized term in the original query. Results are candidates, not an exact or fuzzy identity decision; never select the first result automatically. Follow nextCursor with the same query and limit, including after an empty filtered page. Results are live, bounded, and cursor-paginated; V1 does not provide an unbounded account export.
       operationId: searchAccounts
       security:
         - developerApiKey: []
@@ -107,6 +107,59 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AccountPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /directory/contact-types:
+    get:
+      tags:
+        - Developer API V1
+      summary: List contact types
+      description: Returns the tenant-wide CoreBridge contact type taxonomy after authorizing the requested location.
+      operationId: listContactTypes
+      security:
+        - developerApiKey: []
+      x-required-scope: directory:read
+      parameters:
+        - name: locationId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: B2 Portal CoreBridge location ID granted to the API key.
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Successful response.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            RateLimit-Limit:
+              $ref: '#/components/headers/RateLimitLimit'
+            RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimitRemaining'
+            RateLimit-Reset:
+              $ref: '#/components/headers/RateLimitReset'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContactTypeList'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -261,12 +314,155 @@ paths:
           $ref: '#/components/responses/InternalServerError'
         '503':
           $ref: '#/components/responses/Unavailable'
+  /contacts/lookup:
+    get:
+      tags:
+        - Developer API V1
+      summary: Resolve a contact by exact email
+      description: Returns exact active-contact cardinality within an authorized account. Normalizes whitespace and case only. An incomplete provider read returns 503, never a definitive no-match or unique match.
+      operationId: lookupContactByEmail
+      security:
+        - developerApiKey: []
+      x-required-scope: directory:read
+      parameters:
+        - name: locationId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: B2 Portal CoreBridge location ID granted to the API key.
+        - name: accountId
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 120
+            pattern: .*\S.*
+        - name: email
+          in: query
+          required: true
+          schema:
+            type: string
+            format: email
+            maxLength: 254
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Successful response.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            RateLimit-Limit:
+              $ref: '#/components/headers/RateLimitLimit'
+            RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimitRemaining'
+            RateLimit-Reset:
+              $ref: '#/components/headers/RateLimitReset'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContactEmailLookup'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /rfqs/{rfqId}/push:
+    post:
+      tags:
+        - Developer API V1
+      summary: Explicitly push a ready RFQ to CoreBridge
+      description: Uses the current review target and a stable idempotency key. Read the structured state; HTTP 200 does not by itself mean pushed. A competing in-progress push returns 202. Never retry an uncertain outcome blindly. For a resolved missing-contact-email review, the server updates only an email that remains blank on the exact bound CoreBridge contact, reads it back, reconciles the RFQ customer, and stops before estimate creation if identity or verification fails.
+      operationId: pushRfqToCoreBridge
+      security:
+        - developerApiKey: []
+      x-required-scope: corebridge:push
+      parameters:
+        - name: rfqId
+          in: path
+          required: true
+          description: Exact B2 Portal RFQ identifier.
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CoreBridgePushRequest'
+      responses:
+        '200':
+          description: Successful response.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            RateLimit-Limit:
+              $ref: '#/components/headers/RateLimitLimit'
+            RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimitRemaining'
+            RateLimit-Reset:
+              $ref: '#/components/headers/RateLimitReset'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreBridgePushResult'
+        '202':
+          description: Successful response.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            RateLimit-Limit:
+              $ref: '#/components/headers/RateLimitLimit'
+            RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimitRemaining'
+            RateLimit-Reset:
+              $ref: '#/components/headers/RateLimitReset'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreBridgePushResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/Unavailable'
   /contacts/{contactId}:
     get:
       tags:
         - Developer API V1
       summary: Get an account contact
-      description: Returns one contact only after revalidating that it still belongs to the supplied account.
+      description: Returns the current authoritative CoreBridge contact only after revalidating that it still belongs to the supplied account. Use this endpoint with the account/contact binding from an RFQ review before or after resolving missing contact data when an explicit provider readback is required.
       operationId: getContact
       security:
         - developerApiKey: []
@@ -542,6 +738,231 @@ paths:
           $ref: '#/components/responses/InternalServerError'
         '503':
           $ref: '#/components/responses/Unavailable'
+  /intakes/{intakeId}/retry:
+    post:
+      tags:
+        - Developer API V1
+      summary: Retry a recoverable RFQ intake
+      description: Requeues only an advertised empty-extraction review or a confirmed pre-queue handoff failure. Ambiguous delivery remains blocked. The original intake identity is preserved and the mutation is idempotent.
+      operationId: retryIntake
+      security:
+        - developerApiKey: []
+      x-required-scope: intakes:write
+      parameters:
+        - name: intakeId
+          in: path
+          required: true
+          description: Client-supplied intake ID.
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IntakeRetryRequest'
+      responses:
+        '202':
+          description: Intake requeued for extraction.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            RateLimit-Limit:
+              $ref: '#/components/headers/RateLimitLimit'
+            RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimitRemaining'
+            RateLimit-Reset:
+              $ref: '#/components/headers/RateLimitReset'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntakeRetryResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /intakes/{intakeId}/attachments/{attachmentIndex}:
+    get:
+      tags:
+        - Developer API V1
+      summary: Download an attachment under review
+      description: Returns one available attachment only while the authorized intake is waiting on attachment-evidence review.
+      operationId: downloadIntakeReviewAttachment
+      security:
+        - developerApiKey: []
+      x-required-scope: rfqs:read
+      parameters:
+        - name: intakeId
+          in: path
+          required: true
+          description: Client-supplied intake ID.
+          schema:
+            type: string
+            format: uuid
+        - name: attachmentIndex
+          in: path
+          required: true
+          description: Zero-based attachment index returned by the intake review context.
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 4
+        - name: locationId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: B2 Portal CoreBridge location ID granted to the API key.
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Attachment bytes.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            RateLimit-Limit:
+              $ref: '#/components/headers/RateLimitLimit'
+            RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimitRemaining'
+            RateLimit-Reset:
+              $ref: '#/components/headers/RateLimitReset'
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            application/vnd.openxmlformats-officedocument.presentationml.presentation:
+              schema:
+                type: string
+                format: binary
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema:
+                type: string
+                format: binary
+            image/avif:
+              schema:
+                type: string
+                format: binary
+            image/bmp:
+              schema:
+                type: string
+                format: binary
+            image/gif:
+              schema:
+                type: string
+                format: binary
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /intakes/{intakeId}/attachment-review:
+    post:
+      tags:
+        - Developer API V1
+      summary: Resolve an attachment review
+      description: Keeps selected original attachments, adds confirmed replacements, and replays the same intake identity. A stale revision or changed attachment set is rejected before replay.
+      operationId: resolveIntakeAttachmentReview
+      security:
+        - developerApiKey: []
+      x-required-scope: intakes:write
+      parameters:
+        - name: intakeId
+          in: path
+          required: true
+          description: Client-supplied intake ID.
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IntakeAttachmentRecoveryRequest'
+      responses:
+        '202':
+          description: Recovered intake requeued for extraction.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            RateLimit-Limit:
+              $ref: '#/components/headers/RateLimitLimit'
+            RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimitRemaining'
+            RateLimit-Reset:
+              $ref: '#/components/headers/RateLimitReset'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntakeAttachmentRecoveryResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/Unavailable'
   /intakes/{intakeId}/review-context:
     get:
       tags:
@@ -727,7 +1148,7 @@ paths:
       tags:
         - Developer API V1
       summary: Get RFQ review context
-      description: Returns customer resolution, line-item state, ranked QuickProduct candidates, review targets, allowed actions, and the operator review path.
+      description: Returns customer resolution, line-item state, ranked QuickProduct candidates, review targets, allowed actions, and the operator review path. A MISSING_CONTACT_DATA review remains push-blocking and directs the operator to reviewPath. Its account/contact binding can be read authoritatively with GET /contacts/{contactId}; read this context again after correction before requesting a push.
       operationId: getRfqReviewContext
       security:
         - developerApiKey: []
@@ -990,7 +1411,7 @@ paths:
       tags:
         - Developer API V1
       summary: Apply an RFQ draft action
-      description: Applies one optimistic, idempotent draft mutation such as customer resolution, QuickProduct selection, custom line creation, field edits, or review resolution. It cannot push to CoreBridge.
+      description: Applies one optimistic, idempotent draft mutation such as customer resolution, QuickProduct selection, custom line creation, field edits, or review resolution. It cannot push to CoreBridge. Resolving MISSING_CONTACT_DATA records the proposed email only on the B2 Portal draft; the separately approved push revalidates the exact binding and performs the guarded CoreBridge update and readback.
       operationId: applyRfqDraftAction
       security:
         - developerApiKey: []
@@ -1045,6 +1466,45 @@ paths:
           $ref: '#/components/responses/InternalServerError'
         '503':
           $ref: '#/components/responses/Unavailable'
+webhooks:
+  lifecycle:
+    post:
+      summary: Receive an RFQ lifecycle event
+      description: B2 Portal signs the exact UTF-8 request body. Consumers must verify the signature, deduplicate by event id, and ignore additive fields.
+      operationId: receiveLifecycleWebhook
+      security: []
+      parameters:
+        - name: X-B2-Webhook-Id
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: X-B2-Webhook-Timestamp
+          in: header
+          required: true
+          schema:
+            type: integer
+        - name: X-B2-Webhook-Version
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+        - name: X-B2-Webhook-Signature
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LifecycleWebhookEvent'
+      responses:
+        2XX:
+          description: Delivery accepted.
 components:
   securitySchemes:
     developerApiKey:
@@ -1242,6 +1702,308 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorEnvelope'
   schemas:
+    ContactEmailLookup:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required:
+            - status
+            - contact
+          properties:
+            status:
+              const: UNIQUE_MATCH
+            contact:
+              $ref: '#/components/schemas/DirectoryContact'
+        - type: object
+          additionalProperties: false
+          required:
+            - status
+            - contact
+          properties:
+            status:
+              const: NO_MATCH
+            contact:
+              type: 'null'
+        - type: object
+          additionalProperties: false
+          required:
+            - status
+            - contacts
+          properties:
+            status:
+              const: MULTIPLE_MATCHES
+            contacts:
+              type: array
+              minItems: 2
+              items:
+                $ref: '#/components/schemas/DirectoryContact'
+    CoreBridgePushTarget:
+      type: object
+      additionalProperties: false
+      required:
+        - type
+        - id
+        - version
+      properties:
+        type:
+          const: COREBRIDGE_PUSH
+        id:
+          type: string
+          format: uuid
+        version:
+          type: string
+          pattern: ^[a-f0-9]{64}$
+    CoreBridgeLinks:
+      type: object
+      additionalProperties: false
+      required:
+        - appUrl
+        - environment
+        - resources
+      properties:
+        appUrl:
+          type:
+            - string
+            - 'null'
+          format: uri
+        environment:
+          type: string
+          enum:
+            - production
+            - staging
+            - qa
+            - sandbox
+            - unknown
+        resources:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - resource
+              - label
+              - id
+              - copyValue
+              - url
+              - urlLabel
+              - unavailableReason
+            properties:
+              resource:
+                type: string
+                enum:
+                  - customer
+                  - contact
+                  - order
+                  - estimate
+                  - estimateNumber
+              label:
+                type: string
+              id:
+                type:
+                  - number
+                  - string
+                  - 'null'
+              copyValue:
+                type:
+                  - string
+                  - 'null'
+              url:
+                type:
+                  - string
+                  - 'null'
+                format: uri
+              urlLabel:
+                type:
+                  - string
+                  - 'null'
+              unavailableReason:
+                enum:
+                  - missing_tenant
+                  - unsafe_tenant
+                  - missing_id
+                  - invalid_id
+                  - null
+    CoreBridgePushRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - locationId
+        - expectedRevision
+        - target
+      properties:
+        locationId:
+          type: string
+          format: uuid
+        expectedRevision:
+          type: integer
+          minimum: 0
+        target:
+          $ref: '#/components/schemas/CoreBridgePushTarget'
+        taxGroupSelection:
+          oneOf:
+            - $ref: '#/components/schemas/TaxGroupSelection'
+            - type: 'null'
+    TaxGroupSelection:
+      type: object
+      additionalProperties: false
+      required:
+        - taxGroupId
+        - expectedVersion
+      properties:
+        taxGroupId:
+          type: integer
+          minimum: 1
+        expectedVersion:
+          type: string
+          pattern: ^[a-f0-9]{64}$
+    AvailableAction:
+      type: object
+      additionalProperties: false
+      required:
+        - type
+        - requires
+        - resolvesLine
+      description: One draft action the caller may send for this target. requires lists payload fields beyond type, decisionId, decisionUpdatedAt, reason, and evidence. resolvesLine is true when success moves a line out of the state that raises LINE_ITEM_REVIEW; false means the action does not clear that state by itself.
+      properties:
+        type:
+          type: string
+          enum:
+            - MATCH_QUICKPRODUCT
+            - ADD_CUSTOM_LINE
+            - SEND_AS_CUSTOM_LINE
+            - CORRECT_LINE_ITEM
+            - EXCLUDE_LINE_ITEM
+            - SET_EXPLICIT_PRICE
+            - MARK_CATALOG_GAP
+            - HOLD_FOR_REVIEW
+            - RESOLVE_CUSTOMER_REVIEW
+            - RECONCILE_COMMERCIAL_DOCUMENT
+            - RESOLVE_QUICKPRODUCT_BUNDLE
+        requires:
+          type: array
+          items:
+            type: string
+        resolvesLine:
+          type: boolean
+    CustomerResolution:
+      type: object
+      additionalProperties: false
+      required:
+        - coreBridgeCustomerId
+        - coreBridgeContactId
+        - reviewedAccountDecision
+        - createSuperseded
+        - pendingCreateAtPush
+      description: CoreBridge outcome of customer resolution. Accounts and contacts are created at push; createSuperseded means a reviewed create_new instruction was replaced by an existing binding that the push will use.
+      properties:
+        coreBridgeCustomerId:
+          type:
+            - integer
+            - 'null'
+        coreBridgeContactId:
+          type:
+            - integer
+            - 'null'
+        reviewedAccountDecision:
+          type:
+            - string
+            - 'null'
+          enum:
+            - create_new
+            - link_existing
+            - null
+        createSuperseded:
+          type: boolean
+        pendingCreateAtPush:
+          type: boolean
+    CoreBridgePushResult:
+      type: object
+      additionalProperties: false
+      required:
+        - state
+        - rfqId
+        - locationId
+        - draftRevision
+        - correlationId
+        - reviewPath
+        - reviewUrl
+        - coreBridgeOrderId
+        - coreBridgeEstimateId
+        - coreBridgeEstimateNumber
+        - coreBridgeLinks
+        - blockedReasons
+        - attempt
+      properties:
+        state:
+          type: string
+          enum:
+            - PUSHED
+            - BLOCKED
+            - IN_PROGRESS
+            - FAILED_RETRYABLE
+            - REQUIRES_RECONCILIATION
+            - FAILED
+        rfqId:
+          type: string
+          format: uuid
+        locationId:
+          type: string
+          format: uuid
+        draftRevision:
+          type: integer
+          minimum: 0
+        correlationId:
+          type: string
+          format: uuid
+        reviewPath:
+          type: string
+        reviewUrl:
+          type: string
+          format: uri
+        coreBridgeOrderId:
+          type:
+            - integer
+            - 'null'
+        coreBridgeEstimateId:
+          type:
+            - integer
+            - 'null'
+        coreBridgeEstimateNumber:
+          type:
+            - string
+            - 'null'
+        coreBridgeCustomerId:
+          type:
+            - integer
+            - 'null'
+          description: CoreBridge account the estimate is filed under, from the order customer binding. Always present on a new response; absent only when an idempotency replay returns a response stored before this field existed.
+        coreBridgeContactId:
+          type:
+            - integer
+            - 'null'
+          description: CoreBridge contact on that account, from the order customer binding. Presence follows coreBridgeCustomerId.
+        coreBridgeLinks:
+          $ref: '#/components/schemas/CoreBridgeLinks'
+        blockedReasons:
+          type: array
+          items:
+            type: string
+        attempt:
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required:
+                - eventId
+                - retryable
+                - duplicateRisk
+              properties:
+                eventId:
+                  type: string
+                retryable:
+                  type: boolean
+                duplicateRisk:
+                  type: boolean
+            - type: 'null'
     ErrorEnvelope:
       type: object
       additionalProperties: false
@@ -1347,6 +2109,9 @@ components:
         - name
         - email
         - phone
+        - isPrimary
+        - isBilling
+        - contactTypeId
         - source
       properties:
         id:
@@ -1364,6 +2129,19 @@ components:
           type:
             - string
             - 'null'
+        isPrimary:
+          type:
+            - boolean
+            - 'null'
+        isBilling:
+          type:
+            - boolean
+            - 'null'
+        contactTypeId:
+          type:
+            - integer
+            - 'null'
+          minimum: 1
         source:
           $ref: '#/components/schemas/DirectorySource'
     AccountPage:
@@ -1396,6 +2174,28 @@ components:
           type:
             - string
             - 'null'
+    ContactTypeList:
+      type: object
+      additionalProperties: false
+      required:
+        - contactTypes
+      properties:
+        contactTypes:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContactType'
+    ContactType:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: integer
+          minimum: 1
+        name:
+          type: string
     CustomerSelection:
       type: object
       additionalProperties: false
@@ -1463,6 +2263,12 @@ components:
           type: integer
           minimum: 1
           maximum: 10485760
+        uploadMethod:
+          type: string
+          enum:
+            - POST
+            - PUT
+          default: POST
     PreparedUpload:
       type: object
       additionalProperties: false
@@ -1506,24 +2312,82 @@ components:
         expiresAt:
           type: string
           format: date-time
+          description: Expiration of the unconsumed prepared-upload record, not the shorter-lived storage capability.
         upload:
+          oneOf:
+            - $ref: '#/components/schemas/PresignedPostUpload'
+            - $ref: '#/components/schemas/PresignedPutUpload'
+          discriminator:
+            propertyName: method
+            mapping:
+              POST: '#/components/schemas/PresignedPostUpload'
+              PUT: '#/components/schemas/PresignedPutUpload'
+    PresignedPostUpload:
+      type: object
+      additionalProperties: false
+      required:
+        - method
+        - url
+        - fields
+        - fileField
+        - expiresInSeconds
+      properties:
+        method:
+          type: string
+          const: POST
+        url:
+          type: string
+          format: uri
+        fields:
+          type: object
+          additionalProperties:
+            type: string
+        fileField:
+          type: string
+          const: file
+        expiresInSeconds:
+          type: integer
+          const: 300
+    PresignedPutUpload:
+      type: object
+      additionalProperties: false
+      required:
+        - method
+        - url
+        - headers
+        - expiresInSeconds
+      properties:
+        method:
+          type: string
+          const: PUT
+        url:
+          type: string
+          format: uri
+        headers:
           type: object
           additionalProperties: false
           required:
-            - url
-            - fields
-            - fileField
+            - Content-Type
+            - Content-Length
           properties:
-            url:
+            Content-Type:
               type: string
-              format: uri
-            fields:
-              type: object
-              additionalProperties:
-                type: string
-            fileField:
+              enum:
+                - application/pdf
+                - application/vnd.openxmlformats-officedocument.presentationml.presentation
+                - application/vnd.openxmlformats-officedocument.wordprocessingml.document
+                - image/avif
+                - image/bmp
+                - image/gif
+                - image/jpeg
+                - image/png
+                - image/webp
+            Content-Length:
               type: string
-              const: file
+              pattern: ^[1-9][0-9]*$
+        expiresInSeconds:
+          type: integer
+          const: 300
     ConfirmedUpload:
       type: object
       additionalProperties: false
@@ -1641,7 +2505,9 @@ components:
         - reviewPath
         - reviewUrl
         - coreBridgePushAllowed
+        - failure
         - customerSelection
+        - customerResolution
       properties:
         intakeId:
           type: string
@@ -1702,6 +2568,23 @@ components:
         coreBridgePushAllowed:
           type: boolean
           const: false
+        failure:
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required:
+                - code
+                - retryable
+              properties:
+                code:
+                  type: string
+                  enum:
+                    - HANDOFF_RETRYABLE
+                    - HANDOFF_REQUIRES_RECONCILIATION
+                    - PROCESSING_FAILED
+                retryable:
+                  type: boolean
+            - type: 'null'
         customerSelection:
           oneOf:
             - type: object
@@ -1729,6 +2612,121 @@ components:
                     - string
                     - 'null'
             - type: 'null'
+        customerResolution:
+          oneOf:
+            - $ref: '#/components/schemas/CustomerResolution'
+            - type: 'null'
+    IntakeRetryRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - locationId
+        - expectedRevision
+      properties:
+        locationId:
+          type: string
+          format: uuid
+        expectedRevision:
+          type: integer
+          minimum: 0
+    IntakeRetryResult:
+      type: object
+      additionalProperties: false
+      required:
+        - intakeId
+        - state
+        - draftRevision
+      properties:
+        intakeId:
+          type: string
+          format: uuid
+        state:
+          type: string
+          const: QUEUED
+        draftRevision:
+          type: integer
+          minimum: 1
+    IntakeAttachmentRecoveryRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - locationId
+        - expectedRevision
+        - keepAttachmentIndexes
+        - uploadIds
+      anyOf:
+        - properties:
+            keepAttachmentIndexes:
+              maxItems: 0
+            uploadIds:
+              maxItems: 5
+        - properties:
+            keepAttachmentIndexes:
+              maxItems: 1
+            uploadIds:
+              maxItems: 4
+        - properties:
+            keepAttachmentIndexes:
+              maxItems: 2
+            uploadIds:
+              maxItems: 3
+        - properties:
+            keepAttachmentIndexes:
+              maxItems: 3
+            uploadIds:
+              maxItems: 2
+        - properties:
+            keepAttachmentIndexes:
+              maxItems: 4
+            uploadIds:
+              maxItems: 1
+        - properties:
+            keepAttachmentIndexes:
+              maxItems: 5
+            uploadIds:
+              maxItems: 0
+      properties:
+        locationId:
+          type: string
+          format: uuid
+        expectedRevision:
+          type: integer
+          minimum: 0
+        keepAttachmentIndexes:
+          type: array
+          maxItems: 5
+          uniqueItems: true
+          items:
+            type: integer
+            minimum: 0
+            maximum: 4
+        uploadIds:
+          type: array
+          maxItems: 5
+          uniqueItems: true
+          items:
+            type: string
+            format: uuid
+    IntakeAttachmentRecoveryResult:
+      type: object
+      additionalProperties: false
+      required:
+        - intakeId
+        - state
+        - draftRevision
+        - reviewId
+      properties:
+        intakeId:
+          type: string
+          format: uuid
+        state:
+          type: string
+          const: QUEUED
+        draftRevision:
+          type: integer
+          minimum: 1
+        reviewId:
+          type: 'null'
     IdentityCandidate:
       type: object
       additionalProperties: false
@@ -1991,6 +2989,7 @@ components:
             - MISSING_CUSTOMER
             - DUPLICATE_RFQ
             - COMMERCIAL_DOCUMENT
+            - EMPTY_EXTRACTION
         sourceContext:
           type: object
           additionalProperties: false
@@ -2106,6 +3105,7 @@ components:
                 type: boolean
         allowedActions:
           type: array
+          description: Correction choices accepted inside a RESOLVE_CUSTOMER_REVIEW action; these are not top-level API mutations.
           items:
             type: string
             enum:
@@ -2167,6 +3167,7 @@ components:
         - draftRevision
         - review
         - customerReview
+        - attachmentReview
         - allowedActions
         - operatorReviewRequired
         - coreBridgePushAllowed
@@ -2188,6 +3189,7 @@ components:
             - kind
             - status
             - reviewPath
+            - reviewUrl
           properties:
             id:
               type: string
@@ -2198,6 +3200,9 @@ components:
               type: string
             reviewPath:
               type: string
+            reviewUrl:
+              type: string
+              format: uri
         customerReview:
           oneOf:
             - type: object
@@ -2228,29 +3233,95 @@ components:
                 identity:
                   $ref: '#/components/schemas/IdentityReviewDetail'
             - type: 'null'
+        attachmentReview:
+          oneOf:
+            - $ref: '#/components/schemas/IntakeAttachmentReview'
+            - type: 'null'
         allowedActions:
           type: array
+          description: Top-level API mutations currently accepted for this pre-order review. An empty list means use review.reviewUrl.
           uniqueItems: true
           items:
             type: string
             enum:
               - RESOLVE_CUSTOMER_REVIEW
+              - RECOVER_ATTACHMENTS
+              - RETRY_INTAKE
         operatorReviewRequired:
           type: boolean
           const: true
         coreBridgePushAllowed:
           type: boolean
           const: false
+    IntakeAttachmentReview:
+      type: object
+      additionalProperties: false
+      required:
+        - status
+        - message
+        - attachments
+      properties:
+        status:
+          type: string
+          const: NEEDS_REVIEW
+        message:
+          type: string
+        attachments:
+          type: array
+          maxItems: 5
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - index
+              - name
+              - mimeType
+              - size
+              - available
+              - downloadPath
+            properties:
+              index:
+                type: integer
+                minimum: 0
+                maximum: 4
+              name:
+                type: string
+              mimeType:
+                type:
+                  - string
+                  - 'null'
+              size:
+                type:
+                  - integer
+                  - 'null'
+                minimum: 0
+              available:
+                type: boolean
+              downloadPath:
+                type:
+                  - string
+                  - 'null'
     Rfq:
       type: object
       additionalProperties: false
       required:
         - rfqId
         - rfqNumber
+        - source
         - status
+        - statusLabel
+        - revision
         - draftRevision
         - createdAt
         - updatedAt
+        - reviewUrl
+        - location
+        - customer
+        - lineItems
+        - lineItemsTruncated
+        - attachments
+        - attachmentsTruncated
+        - customerResolution
         - coreBridgePushAllowed
       properties:
         rfqId:
@@ -2258,8 +3329,24 @@ components:
           format: uuid
         rfqNumber:
           type: string
+        source:
+          type: string
+          enum:
+            - developer_api
+            - quote_bot
+            - email_direct
+            - email_forwarded
+            - portal_notes
+            - portal_manual
+            - mcp_notes
+            - mcp_email_forward
         status:
           type: string
+        statusLabel:
+          type: string
+        revision:
+          type: integer
+          minimum: 0
         draftRevision:
           type: integer
           minimum: 0
@@ -2271,9 +3358,231 @@ components:
             - string
             - 'null'
           format: date-time
+        reviewUrl:
+          type:
+            - string
+            - 'null'
+          format: uri
+        location:
+          $ref: '#/components/schemas/RfqLocation'
+        customer:
+          $ref: '#/components/schemas/RfqCustomer'
+        lineItems:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/RfqLineItem'
+        lineItemsTruncated:
+          type: boolean
+        attachments:
+          type: array
+          maxItems: 20
+          items:
+            $ref: '#/components/schemas/RfqAttachment'
+        attachmentsTruncated:
+          type: boolean
+        customerResolution:
+          oneOf:
+            - $ref: '#/components/schemas/CustomerResolution'
+            - type: 'null'
         coreBridgePushAllowed:
           type: boolean
           const: false
+    RfqLocation:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+    RfqContact:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - email
+        - phone
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+    RfqCustomer:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - email
+        - phone
+        - companyName
+        - contact
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        companyName:
+          type:
+            - string
+            - 'null'
+        contact:
+          $ref: '#/components/schemas/RfqContact'
+    RfqLineItem:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - description
+        - quantity
+        - unitPrice
+        - notes
+      properties:
+        id:
+          type: string
+          format: uuid
+        description:
+          type: string
+        quantity:
+          type:
+            - integer
+            - 'null'
+        unitPrice:
+          type:
+            - number
+            - 'null'
+          minimum: 0
+        notes:
+          type:
+            - string
+            - 'null'
+    RfqAttachment:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - filename
+        - mimeType
+        - size
+        - description
+      properties:
+        id:
+          type: string
+          format: uuid
+        filename:
+          type: string
+        mimeType:
+          type: string
+        size:
+          type: integer
+          minimum: 0
+        description:
+          type:
+            - string
+            - 'null'
+    LifecycleWebhookEvent:
+      description: Signed lifecycle webhook body. Historical and Developer API V1 deliveries may omit data.source.
+      type: object
+      required:
+        - id
+        - type
+        - version
+        - createdAt
+        - organizationId
+        - api
+        - data
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum:
+            - rfq.intake.received
+            - rfq.intake.failed
+            - rfq.review.required
+            - rfq.draft.ready
+            - rfq.draft.updated
+            - rfq.pushed_to_corebridge
+            - rfq.push.failed
+            - webhook.test
+        version:
+          type: string
+          const: '1'
+        createdAt:
+          type: string
+          format: date-time
+        organizationId:
+          type: string
+          format: uuid
+        api:
+          type: object
+          required:
+            - intakeId
+            - rfqId
+            - locationId
+          properties:
+            intakeId:
+              type:
+                - string
+                - 'null'
+              format: uuid
+            rfqId:
+              type:
+                - string
+                - 'null'
+              format: uuid
+            locationId:
+              type:
+                - string
+                - 'null'
+              format: uuid
+        data:
+          type: object
+          properties:
+            source:
+              type: string
+              enum:
+                - developer_api
+                - quote_bot
+                - email_direct
+                - email_forwarded
+                - portal_notes
+                - portal_manual
+                - mcp_notes
+                - mcp_email_forward
+            state:
+              type: string
+            revision:
+              type: integer
+              minimum: 0
+            reviewId:
+              type: string
+              format: uuid
+            reviewKind:
+              type: string
+            reviewPath:
+              type: string
+            reviewUrl:
+              type: string
+              format: uri
+            reasonCode:
+              type: string
+            coreBridgeOrderId:
+              type: integer
+              minimum: 1
+            coreBridgeEstimateNumber:
+              type:
+                - string
+                - 'null'
     LineItemSetTarget:
       type: object
       additionalProperties: false
@@ -2705,6 +4014,7 @@ components:
           type: string
           minLength: 1
           maxLength: 120
+          pattern: .*\S.*
         description:
           type: string
           minLength: 1
@@ -2826,9 +4136,7 @@ components:
     CorrectLineItemAction:
       type: object
       additionalProperties: false
-      description: Replaces one source line with corrected description and quantity, then
-        rebuilds its match decision. Read the latest review context and apply the desired
-        QuickProduct, custom-line price, catalog-gap, or review action to the replacement.
+      description: Replaces one source line with corrected description and quantity, then rebuilds its match decision. Read the latest review context and apply the desired QuickProduct, custom-line price, catalog-gap, or review action to the replacement.
       required:
         - type
         - decisionId
@@ -3029,7 +4337,9 @@ components:
           maxItems: 500
           items:
             type: string
-            format: uuid
+            minLength: 1
+            maxLength: 120
+            pattern: .*\S.*
         reason:
           type: string
           minLength: 1
@@ -3456,6 +4766,7 @@ components:
             - rejectedCandidates
             - latestResolutionId
             - resolutionCount
+            - availableActions
           properties:
             id:
               type: string
@@ -3514,6 +4825,11 @@ components:
             resolutionCount:
               type: integer
               minimum: 0
+            availableActions:
+              type: array
+              description: Draft actions the API accepts for this line decision. Empty for an excluded line, and for every line once the RFQ has been pushed or a push is in progress.
+              items:
+                $ref: '#/components/schemas/AvailableAction'
     ReviewDimensions:
       type: object
       additionalProperties: false
@@ -3577,6 +4893,7 @@ components:
         - coreBridgeLocationId
         - customer
         - coreBridgeBinding
+        - coreBridgeLinks
       properties:
         id:
           type: string
@@ -3649,6 +4966,7 @@ components:
                 - syncStatus
                 - coreBridgeOrderId
                 - coreBridgeEstimateId
+                - coreBridgeEstimateNumber
               properties:
                 syncStatus:
                   type: string
@@ -3660,7 +4978,88 @@ components:
                   type:
                     - integer
                     - 'null'
+                coreBridgeEstimateNumber:
+                  type:
+                    - string
+                    - 'null'
             - type: 'null'
+        coreBridgeLinks:
+          $ref: '#/components/schemas/CoreBridgeLinks'
+    CoreBridgeTaxGroupReview:
+      type: object
+      additionalProperties: false
+      required:
+        - blockerCode
+        - reasonCode
+        - version
+        - location
+        - providerDefaultTaxGroupId
+        - geographyDerivedTaxGroupId
+        - selectedTaxGroupId
+        - options
+      properties:
+        blockerCode:
+          enum:
+            - TAX_GROUP_SELECTION_REQUIRED
+            - TAX_GROUP_CONFIGURATION_REQUIRED
+            - null
+        reasonCode:
+          type:
+            - string
+            - 'null'
+        version:
+          type: string
+          pattern: ^[a-f0-9]{64}$
+        location:
+          type: object
+          additionalProperties: false
+          required:
+            - id
+            - name
+          properties:
+            id:
+              type: integer
+              minimum: 1
+            name:
+              type: string
+        providerDefaultTaxGroupId:
+          type:
+            - integer
+            - 'null'
+          minimum: 1
+        geographyDerivedTaxGroupId:
+          type:
+            - integer
+            - 'null'
+          minimum: 1
+        selectedTaxGroupId:
+          type:
+            - integer
+            - 'null'
+          minimum: 1
+        options:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - id
+              - name
+              - taxRate
+              - isLocationDefault
+              - isAddressCandidate
+            properties:
+              id:
+                type: integer
+                minimum: 1
+              name:
+                type: string
+              taxRate:
+                type: number
+              isLocationDefault:
+                type: boolean
+              isAddressCandidate:
+                type: boolean
     ReviewCustomerResolution:
       type: object
       additionalProperties: false
@@ -3672,6 +5071,7 @@ components:
         - version
         - reasonCode
         - reasonLabel
+        - availableActions
       properties:
         target:
           $ref: '#/components/schemas/DraftTarget'
@@ -3693,6 +5093,11 @@ components:
           type:
             - string
             - 'null'
+        availableActions:
+          type: array
+          description: Draft actions the API accepts for this review in its current state. Empty once the RFQ has been pushed or a push is in progress; otherwise an empty list means complete the review in the portal at the context reviewPath.
+          items:
+            $ref: '#/components/schemas/AvailableAction'
     ReviewCommercialDocument:
       type: object
       additionalProperties: false
@@ -3799,6 +5204,8 @@ components:
         - catalog
         - allowedActions
         - operatorMustAccept
+        - taxGroupReview
+        - pushTarget
         - coreBridgePushAllowed
         - reviewPath
       properties:
@@ -3889,9 +5296,15 @@ components:
         operatorMustAccept:
           type: boolean
           const: false
+        taxGroupReview:
+          oneOf:
+            - $ref: '#/components/schemas/CoreBridgeTaxGroupReview'
+            - type: 'null'
         coreBridgePushAllowed:
           type: boolean
-          const: false
+          description: True when the key grants corebridge:push and every remaining blocker is either clear or the advertised tax selection accepted by the push request.
+        pushTarget:
+          $ref: '#/components/schemas/CoreBridgePushTarget'
         reviewPath:
           type: string
     CatalogState:
