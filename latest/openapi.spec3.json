@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "B2 Portal Developer API",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "license": {
       "name": "Proprietary",
       "url": "https://b2portal.com/terms"
@@ -248,6 +248,90 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ContactTypeList"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/directory/corebridge-users": {
+      "get": {
+        "tags": [
+          "Developer API V1"
+        ],
+        "summary": "List CoreBridge users",
+        "description": "Returns the active CoreBridge users an integration can name as enteredBy on a push, as last refreshed from CoreBridge, after authorizing the requested location.",
+        "operationId": "listCoreBridgeUsers",
+        "security": [
+          {
+            "developerApiKey": []
+          }
+        ],
+        "x-required-scope": "directory:read",
+        "parameters": [
+          {
+            "name": "locationId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "B2 Portal CoreBridge location ID granted to the API key."
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoreBridgeUserList"
                 }
               }
             }
@@ -2879,6 +2963,110 @@
                 "type": "null"
               }
             ]
+          },
+          "enteredBy": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "coreBridgeUserId"
+                ],
+                "description": "Who CoreBridge shows as Entered by. A CoreBridge user ID credits that person; null credits CoreBridge API. Omit to use the RFQ's choice.",
+                "properties": {
+                  "coreBridgeUserId": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 1
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "CoreBridgeCredit": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "enteredBy"
+        ],
+        "description": "Who CoreBridge credits as Entered by. A null coreBridgeUserId means CoreBridge credited its API user.",
+        "properties": {
+          "enteredBy": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "coreBridgeUserId",
+              "source"
+            ],
+            "properties": {
+              "coreBridgeUserId": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "source": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "SELECTED",
+                  "PUSHING_USER",
+                  null
+                ]
+              }
+            }
+          }
+        }
+      },
+      "CoreBridgeUserList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "users"
+        ],
+        "properties": {
+          "users": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CoreBridgeUser"
+            }
+          }
+        }
+      },
+      "CoreBridgeUser": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "coreBridgeUserId",
+          "name",
+          "email",
+          "isSalesperson"
+        ],
+        "properties": {
+          "coreBridgeUserId": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "isSalesperson": {
+            "type": "boolean"
           }
         }
       },
@@ -2996,7 +3184,8 @@
           "coreBridgeEstimateNumber",
           "coreBridgeLinks",
           "blockedReasons",
-          "attempt"
+          "attempt",
+          "coreBridgeCredit"
         ],
         "properties": {
           "state": {
@@ -3095,6 +3284,16 @@
                     "type": "boolean"
                   }
                 }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "coreBridgeCredit": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CoreBridgeCredit"
               },
               {
                 "type": "null"
@@ -5341,6 +5540,9 @@
                   "string",
                   "null"
                 ]
+              },
+              "coreBridgeCredit": {
+                "$ref": "#/components/schemas/CoreBridgeCredit"
               }
             }
           }
@@ -7328,7 +7530,8 @@
                   "syncStatus",
                   "coreBridgeOrderId",
                   "coreBridgeEstimateId",
-                  "coreBridgeEstimateNumber"
+                  "coreBridgeEstimateNumber",
+                  "coreBridgeCredit"
                 ],
                 "properties": {
                   "syncStatus": {
@@ -7350,6 +7553,16 @@
                     "type": [
                       "string",
                       "null"
+                    ]
+                  },
+                  "coreBridgeCredit": {
+                    "oneOf": [
+                      {
+                        "$ref": "#/components/schemas/CoreBridgeCredit"
+                      },
+                      {
+                        "type": "null"
+                      }
                     ]
                   }
                 }
