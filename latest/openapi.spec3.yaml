@@ -1902,7 +1902,6 @@ components:
               additionalProperties: false
               required:
                 - coreBridgeUserId
-              description: Who CoreBridge shows as Entered by. A CoreBridge user ID credits that person; null credits CoreBridge API. Omit to use the RFQ's choice.
               properties:
                 coreBridgeUserId:
                   type:
@@ -1910,6 +1909,7 @@ components:
                     - 'null'
                   minimum: 1
             - type: 'null'
+          description: 'Who CoreBridge shows as Entered by. `{ "coreBridgeUserId": <id> }` credits that CoreBridge user, and `{ "coreBridgeUserId": null }` credits CoreBridge''s API user. Omit `enteredBy`, or send `null`, to use the choice saved on the RFQ.'
     CoreBridgeCredit:
       type: object
       additionalProperties: false
