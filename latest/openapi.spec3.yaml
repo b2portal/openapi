@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: B2 Portal Developer API
-  version: 0.3.0
+  version: 0.4.0
   license:
     name: Proprietary
     url: https://b2portal.com/terms
@@ -690,7 +690,7 @@ paths:
       tags:
         - Developer API V1
       summary: Create an RFQ intake
-      description: Accepts notes and confirmed upload IDs, persists the intake atomically, and returns before asynchronous RFQ extraction completes.
+      description: Accepts notes and confirmed upload IDs, persists the intake atomically, and returns before asynchronous RFQ extraction completes. A customerSelection also requires the directory:read scope, and one with newContact also requires rfqs:write. A VALIDATED selection in the response means its IDs, and for newContact the local email check, passed when the request was accepted; it does not promise the intake avoids review. Read GET /intakes/{intakeId} for the live state.
       operationId: createIntake
       security:
         - developerApiKey: []
@@ -1081,7 +1081,7 @@ paths:
       tags:
         - Developer API V1
       summary: Apply an intake draft action
-      description: Applies one versioned pre-order review action, then resumes asynchronous intake processing. It cannot push to CoreBridge.
+      description: Applies one versioned pre-order review action, then resumes asynchronous intake processing. It cannot push to CoreBridge. A 503 means nothing changed; the Idempotency-Key replays its first response, so retry with a new key.
       operationId: applyIntakeDraftAction
       security:
         - developerApiKey: []
@@ -1464,7 +1464,7 @@ paths:
       tags:
         - Developer API V1
       summary: Apply an RFQ draft action
-      description: Applies one optimistic, idempotent draft mutation such as customer resolution, QuickProduct selection, custom line creation, field edits, or review resolution. It cannot push to CoreBridge. Resolving MISSING_CONTACT_DATA records the proposed email only on the B2 Portal draft; the separately approved push revalidates the exact binding and performs the guarded CoreBridge update and readback.
+      description: Applies one optimistic, idempotent draft mutation such as customer resolution, QuickProduct selection, custom line creation, field edits, or review resolution. It cannot push to CoreBridge. Resolving MISSING_CONTACT_DATA records the proposed email only on the B2 Portal draft; the separately approved push revalidates the exact binding and performs the guarded CoreBridge update and readback. A 503 means nothing changed; the Idempotency-Key replays its first response, so retry with a new key.
       operationId: applyRfqDraftAction
       security:
         - developerApiKey: []
@@ -2165,6 +2165,9 @@ components:
                 - string
                 - 'null'
               format: uuid
+            reason:
+              type: string
+              description: 'Why the request was refused. Current values: CONTACT_REQUIRED, CONTACT_ON_OTHER_ACCOUNT, CONTACT_ON_OTHER_COMPANY, REVIEW_ALREADY_CLOSED, INTAKE_ID_IN_USE, REVISION_STALE. New values can be added without a breaking change. Every reason comes with HTTP 409 and code DEVELOPER_API_CONFLICT. CONTACT_REQUIRED: an existing-account correction named no contact on that account. CONTACT_ON_OTHER_ACCOUNT: the contact or its email is already linked to a different account. CONTACT_ON_OTHER_COMPANY: the contact''s email belongs to a customer filed under a different company. REVIEW_ALREADY_CLOSED: the review was already resolved or dismissed; read it again instead of retrying. INTAKE_ID_IN_USE: an earlier intake used this intakeId; if you sent it, read GET /intakes/{intakeId}, otherwise send the intake with a different intakeId. REVISION_STALE: the intake, RFQ, or review changed since you read it; read it again and retry with a new Idempotency-Key. A refused request never succeeds when sent again unchanged: follow the reason''s instruction, and send any corrected request with a new Idempotency-Key. A missing or unknown reason has no specific instruction; read the resource again before deciding.'
     Location:
       type: object
       additionalProperties: false
@@ -2324,11 +2327,39 @@ components:
           minimum: 1
         name:
           type: string
+    NewContact:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - email
+      description: A person to add as a contact on the selected CoreBridge account. B2 Portal trims each field and lowercases the email before storing it.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 300
+          description: Full name of the contact.
+        email:
+          type: string
+          format: email
+          maxLength: 320
+          description: The contact's own email. B2 Portal placeholder addresses are refused.
+        phone:
+          type:
+            - string
+            - 'null'
+          maxLength: 100
+          description: Phone number. Omit it or send null when unknown; a blank value is stored as null.
     CustomerSelection:
       type: object
       additionalProperties: false
       required:
         - accountId
+      not:
+        required:
+          - contactId
+          - newContact
       properties:
         accountId:
           type: string
@@ -2338,6 +2369,9 @@ components:
           type: string
           minLength: 1
           maxLength: 120
+        newContact:
+          $ref: '#/components/schemas/NewContact'
+          description: Contact to create on the account when no existing contact on it matches the request. An existing contact wins when an email or phone in the request, or else this email, matches exactly one contact on the account. Applied only when the intake is held because no contact on the account matched. Send contactId or newContact, not both. Requires the rfqs:write scope.
     AcceptedCustomerSelection:
       type: object
       additionalProperties: false
@@ -2355,6 +2389,10 @@ components:
         state:
           type: string
           const: VALIDATED
+          description: The selected IDs, and for newContact the local email check, passed when the request was accepted. The intake can still be held for review.
+        newContact:
+          $ref: '#/components/schemas/NewContact'
+          description: The newContact sent with the request, as stored.
     PrepareUploadRequest:
       type: object
       additionalProperties: false
@@ -2735,10 +2773,15 @@ components:
                     - VALIDATED
                     - RESOLVED
                     - NEEDS_REVIEW
+                  description: 'VALIDATED: accepted and not yet applied. An intake held before its selection is read, for example when the notes name no customer company, keeps VALIDATED. RESOLVED: the selection, a supplied newContact, or a review decision settled the customer. NEEDS_REVIEW: the customer review is open; reasonCode says why.'
                 reasonCode:
                   type:
                     - string
                     - 'null'
+                  description: 'RESOLVED: selected_contact_resolved (the selected or matched contact), supplied_new_contact_resolved (the supplied newContact was created on the account), operator_resolution_superseded_selection (a review decision replaced the selection). NEEDS_REVIEW: selected_account_contact_unresolved (no contact on the account matched; a supplied newContact is applied right after this hold), supplied_new_contact_on_other_account (its email is already linked to a different account), supplied_new_contact_on_other_company (its email belongs to a customer filed under a different company), supplied_new_contact_not_applied (it could not be applied), selected_contact_missing_email, selected_account_contact_directory_too_large, selected_account_tenant_changed, selected_contact_invalid_identity, selected_identity_stale, selected_identity_requires_review. Resolve an open review yourself; treat an unknown value as needing review.'
+                newContact:
+                  $ref: '#/components/schemas/NewContact'
+                  description: The newContact sent with the intake, as stored. state and reasonCode say whether it was applied.
             - type: 'null'
         customerResolution:
           oneOf:
@@ -3946,6 +3989,7 @@ components:
       required:
         - mode
         - coreBridgeContactId
+      description: An existing contact on the selected account. With the directory:read scope any contact on that account in CoreBridge is accepted; without it, only a contact already linked to a B2 Portal customer.
       properties:
         mode:
           type: string
@@ -3989,6 +4033,7 @@ components:
       required:
         - mode
         - customerId
+      description: An existing CoreBridge account, paired with a contact on it. With the directory:read scope any account in the shop's CoreBridge directory is accepted; without it, only an account in the review's coreBridgeAccountCandidates or already linked to a B2 Portal customer. A review that lists coreBridgeAccountCandidates accepts only one of them.
       properties:
         mode:
           type: string
