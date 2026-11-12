@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "B2 Portal Developer API",
-    "version": "0.4.0",
+    "version": "0.4.1",
     "license": {
       "name": "Proprietary",
       "url": "https://b2portal.com/terms"
@@ -1405,6 +1405,12 @@
           "200": {
             "description": "Attachment bytes.",
             "headers": {
+              "Content-Disposition": {
+                "$ref": "#/components/headers/ContentDisposition"
+              },
+              "Content-Length": {
+                "$ref": "#/components/headers/ContentLength"
+              },
               "X-Correlation-ID": {
                 "$ref": "#/components/headers/CorrelationId"
               },
@@ -1420,30 +1426,6 @@
             },
             "content": {
               "application/pdf": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              },
-              "application/vnd.openxmlformats-officedocument.presentationml.presentation": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              },
-              "application/vnd.openxmlformats-officedocument.wordprocessingml.document": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              },
-              "image/avif": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              },
-              "image/bmp": {
                 "schema": {
                   "type": "string",
                   "format": "binary"
@@ -1859,6 +1841,255 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Rfq"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/rfqs/{rfqId}/attachments": {
+      "get": {
+        "tags": [
+          "Developer API V1"
+        ],
+        "summary": "List an RFQ's attachments",
+        "description": "Returns every file on the RFQ, oldest first. Follow nextCursor until it is null. Download a file with GET /rfqs/{rfqId}/attachments/{attachmentId}/content.",
+        "operationId": "listRfqAttachments",
+        "security": [
+          {
+            "developerApiKey": []
+          }
+        ],
+        "x-required-scope": "rfqs:read",
+        "parameters": [
+          {
+            "name": "rfqId",
+            "in": "path",
+            "required": true,
+            "description": "B2 Portal RFQ ID.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "locationId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "B2 Portal CoreBridge location ID granted to the API key."
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 50
+            }
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RfqAttachmentPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/rfqs/{rfqId}/attachments/{attachmentId}/content": {
+      "get": {
+        "tags": [
+          "Developer API V1"
+        ],
+        "summary": "Download an RFQ attachment",
+        "description": "Returns one file's bytes. The file name is in Content-Disposition. Content-Length carries the size unless the transfer is compressed; send Accept-Encoding: identity to always receive it. Files other than PDF, GIF, JPEG, PNG and WebP are sent as application/octet-stream; mimeType in the attachment list is the stored type. A connection that closes before the response is complete is a failed download; request the file again.",
+        "operationId": "downloadRfqAttachment",
+        "security": [
+          {
+            "developerApiKey": []
+          }
+        ],
+        "x-required-scope": "rfqs:read",
+        "parameters": [
+          {
+            "name": "rfqId",
+            "in": "path",
+            "required": true,
+            "description": "B2 Portal RFQ ID.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "attachmentId",
+            "in": "path",
+            "required": true,
+            "description": "Attachment ID from the RFQ or its attachment list.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "locationId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "B2 Portal CoreBridge location ID granted to the API key."
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Attachment bytes.",
+            "headers": {
+              "Content-Disposition": {
+                "$ref": "#/components/headers/ContentDisposition"
+              },
+              "Content-Length": {
+                "$ref": "#/components/headers/ContentLength"
+              },
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              }
+            },
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/gif": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
                 }
               }
             }
@@ -2504,6 +2735,20 @@
       }
     },
     "headers": {
+      "ContentDisposition": {
+        "description": "The file name, as filename and filename*. The disposition is inline for PDF, GIF, JPEG, PNG and WebP and attachment for every other file.",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "ContentLength": {
+        "description": "Size of the file in bytes. Absent when the transfer is compressed; send Accept-Encoding: identity to always receive it.",
+        "schema": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
       "CorrelationId": {
         "description": "Request correlation ID.",
         "schema": {
@@ -5316,7 +5561,8 @@
             }
           },
           "attachmentsTruncated": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "True when the RFQ has more than 20 attachments. GET /rfqs/{rfqId}/attachments lists all of them."
           },
           "customerResolution": {
             "oneOf": [
@@ -5471,6 +5717,30 @@
               "string",
               "null"
             ]
+          }
+        }
+      },
+      "RfqAttachmentPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "attachments",
+          "nextCursor"
+        ],
+        "properties": {
+          "attachments": {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "$ref": "#/components/schemas/RfqAttachment"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Cursor for the next page; null on the last page."
           }
         }
       },
