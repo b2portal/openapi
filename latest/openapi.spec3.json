@@ -1405,6 +1405,12 @@
           "200": {
             "description": "Attachment bytes.",
             "headers": {
+              "Content-Disposition": {
+                "$ref": "#/components/headers/ContentDisposition"
+              },
+              "Content-Length": {
+                "$ref": "#/components/headers/ContentLength"
+              },
               "X-Correlation-ID": {
                 "$ref": "#/components/headers/CorrelationId"
               },
@@ -2030,6 +2036,12 @@
           "200": {
             "description": "Attachment bytes.",
             "headers": {
+              "Content-Disposition": {
+                "$ref": "#/components/headers/ContentDisposition"
+              },
+              "Content-Length": {
+                "$ref": "#/components/headers/ContentLength"
+              },
               "X-Correlation-ID": {
                 "$ref": "#/components/headers/CorrelationId"
               },
@@ -2723,6 +2735,20 @@
       }
     },
     "headers": {
+      "ContentDisposition": {
+        "description": "The file name, as filename and filename*. The disposition is inline for PDF, GIF, JPEG, PNG and WebP and attachment for every other file.",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "ContentLength": {
+        "description": "Size of the file in bytes. Absent when the transfer is compressed; send Accept-Encoding: identity to always receive it.",
+        "schema": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
       "CorrelationId": {
         "description": "Request correlation ID.",
         "schema": {
